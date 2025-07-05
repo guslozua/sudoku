@@ -208,11 +208,17 @@
 
             const remainingNumbers = calculateRemainingNumbers();
 
-            // ✅ FUNCIONES DE HIGHLIGHTING INTELIGENTE MEJORADAS
+            // ✅ FUNCIONES DE HIGHLIGHTING INTELIGENTE + VALIDACIÓN DE ERRORES
             const getCellHighlightType = (rowIndex, colIndex) => {
                 const currentValue = board[rowIndex][colIndex];
+                const cellKey = `${rowIndex}-${colIndex}`;
                 
-                // 1. Celda seleccionada - máxima prioridad
+                // 0. ERROR - Máxima prioridad (anula todo lo demás)
+                if (errorCells.has(cellKey)) {
+                    return 'error';
+                }
+                
+                // 1. Celda seleccionada - alta prioridad
                 if (selectedCell && selectedCell.row === rowIndex && selectedCell.col === colIndex) {
                     return 'selected';
                 }
@@ -265,6 +271,11 @@
                 // Highlighting según tipo (solo si no está completado)
                 if (!puzzleCompleted) {
                     switch (highlightType) {
+                        case 'error':
+                            classes += isDarkMode 
+                                ? 'bg-red-900 text-red-200 ring-2 ring-red-500 shadow-lg animate-pulse ' 
+                                : 'bg-red-100 text-red-800 ring-2 ring-red-500 shadow-lg animate-pulse ';
+                            break;
                         case 'selected':
                             classes += isDarkMode 
                                 ? 'ring-2 ring-blue-400 bg-gray-700 shadow-lg ' 
@@ -297,13 +308,21 @@
                 return classes;
             };
 
-            // ✅ MEJORADO: Selección con highlighting automático
+            // ✅ MEJORADO: Selección con highlighting automático + DEBUG DE ERRORES
             const handleCellClick = (row, col) => {
                 if (!puzzleCompleted) {
                     setSelectedCell({ row, col });
                     
-                    // Si la celda tiene un número, seleccionar ese número automáticamente
+                    // 🔴 Debug de errores
                     const cellValue = board[row][col];
+                    const cellKey = `${row}-${col}`;
+                    const hasError = errorCells.has(cellKey);
+                    
+                    if (hasError) {
+                        console.log(`🔴 CELDA CON ERROR detectada en (${row}, ${col}) con valor ${cellValue}`);
+                    }
+                    
+                    // Si la celda tiene un número, seleccionar ese número automáticamente
                     if (cellValue !== 0) {
                         setSelectedNumber(cellValue);
                         console.log(`🎨 HIGHLIGHTING TRIPLE ACTIVADO:`);
@@ -312,6 +331,7 @@
                         console.log(`  - 🟦 Resaltando fila ${row + 1} (azul claro)`);
                         console.log(`  - 🟦 Resaltando columna ${col + 1} (azul claro)`);
                         console.log(`  - 🔷 Las celdas con mismo número EN fila/columna tendrán doble resaltado`);
+                        if (hasError) console.log(`  - 🔴 ¡ATENCIÓN! Esta celda tiene conflictos`);
                     } else {
                         console.log(`🎨 HIGHLIGHTING FILA/COLUMNA ACTIVADO:`);
                         console.log(`  - Celda seleccionada: (${row}, ${col}) - celda vacía`);
@@ -365,6 +385,20 @@
                     console.log('  ✅ ANTES - initialBoard[' + selectedCell.row + '][' + selectedCell.col + ']:', initialBoard[selectedCell.row][selectedCell.col]);
                     
                     setBoard(newBoard);
+                    
+                    // 🔴 VERIFICAR ERRORES DESPUÉS DE COLOCAR NÚMERO
+                    setTimeout(() => {
+                        const newErrorCells = getAllErrorCells();
+                        if (newErrorCells.size > 0) {
+                            console.log(`🔴 ERRORES DETECTADOS después de colocar ${number}:`);
+                            newErrorCells.forEach(cellKey => {
+                                const [r, c] = cellKey.split('-').map(Number);
+                                console.log(`  - Celda (${r}, ${c}) con valor ${board[r][c]}`);
+                            });
+                        } else {
+                            console.log(`✅ Sin errores después de colocar ${number}`);
+                        }
+                    }, 10);
                     
                     // ✅ VERIFICAR que initialBoard NO cambió después del setState
                     setTimeout(() => {
@@ -466,28 +500,70 @@
                 loadNewPuzzle(newDifficulty);
             };
 
-            // Verificar conflictos
+            // 🤖 SISTEMA DE VALIDACIÓN DE ERRORES MEJORADO
             const hasConflict = (row, col, num) => {
                 if (num === 0) return false;
 
+                // Verificar fila
                 for (let c = 0; c < 9; c++) {
-                    if (c !== col && board[row][c] === num) return true;
+                    if (c !== col && board[row][c] === num) {
+                        return { type: 'row', conflictCells: [{row, col: c}] };
+                    }
                 }
 
+                // Verificar columna
                 for (let r = 0; r < 9; r++) {
-                    if (r !== row && board[r][col] === num) return true;
+                    if (r !== row && board[r][col] === num) {
+                        return { type: 'column', conflictCells: [{row: r, col}] };
+                    }
                 }
 
+                // Verificar subcuadro 3x3
                 const startRow = Math.floor(row / 3) * 3;
                 const startCol = Math.floor(col / 3) * 3;
+                const conflictCells = [];
+                
                 for (let r = startRow; r < startRow + 3; r++) {
                     for (let c = startCol; c < startCol + 3; c++) {
-                        if ((r !== row || c !== col) && board[r][c] === num) return true;
+                        if ((r !== row || c !== col) && board[r][c] === num) {
+                            conflictCells.push({row: r, col: c});
+                        }
                     }
+                }
+                
+                if (conflictCells.length > 0) {
+                    return { type: 'box', conflictCells };
                 }
 
                 return false;
             };
+            
+            // 🎯 DETECTAR TODAS LAS CELDAS EN ERROR
+            const getAllErrorCells = () => {
+                const errorCells = new Set();
+                
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        const num = board[row][col];
+                        if (num !== 0) {
+                            const conflict = hasConflict(row, col, num);
+                            if (conflict) {
+                                // Añadir la celda actual
+                                errorCells.add(`${row}-${col}`);
+                                // Añadir todas las celdas en conflicto
+                                conflict.conflictCells.forEach(cell => {
+                                    errorCells.add(`${cell.row}-${cell.col}`);
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                return errorCells;
+            };
+            
+            // 📊 CALCULAR CELDAS EN ERROR UNA SOLA VEZ
+            const errorCells = React.useMemo(() => getAllErrorCells(), [board]);
 
             // Controles de teclado
             useEffect(() => {
@@ -623,7 +699,6 @@
                                 } ${puzzleCompleted ? 'ring-4 ring-green-400' : ''}`}>
                                     {board.map((row, rowIndex) =>
                                         row.map((cell, colIndex) => {
-                                            const hasError = hasConflict(rowIndex, colIndex, cell);
                                             const isSubgridBorder = {
                                                 borderRight: (colIndex + 1) % 3 === 0 && colIndex !== 8,
                                                 borderBottom: (rowIndex + 1) % 3 === 0 && rowIndex !== 8
@@ -638,12 +713,6 @@
                                                         ${getCellClasses(rowIndex, colIndex)}
                                                         w-12 h-12 lg:w-14 lg:h-14 text-lg lg:text-xl
                                                         ${puzzleCompleted ? 'cursor-not-allowed' : ''}
-                                                        ${hasError && !puzzleCompleted
-                                                            ? isDarkMode 
-                                                                ? 'bg-red-900 text-red-300 ring-2 ring-red-500' 
-                                                                : 'bg-red-100 text-red-700 ring-2 ring-red-400'
-                                                            : ''
-                                                        }
                                                         ${isSubgridBorder.borderRight ? 'border-r-2 border-r-gray-800' : ''}
                                                         ${isSubgridBorder.borderBottom ? 'border-b-2 border-b-gray-800' : ''}
                                                     `}

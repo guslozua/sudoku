@@ -106,6 +106,153 @@ class SudokuController
         return $user['id'];
     }
     
+    /**
+     * Generar pista inteligente
+     */
+    public function generateIntelligentHint($boardString)
+    {
+        try {
+            // Convertir string a array 2D
+            $board = [];
+            for ($i = 0; $i < 9; $i++) {
+                $row = [];
+                for ($j = 0; $j < 9; $j++) {
+                    $row[] = intval($boardString[$i * 9 + $j]);
+                }
+                $board[] = $row;
+            }
+            
+            // Buscar celdas vacías
+            $emptyCells = [];
+            for ($row = 0; $row < 9; $row++) {
+                for ($col = 0; $col < 9; $col++) {
+                    if ($board[$row][$col] === 0) {
+                        $emptyCells[] = ['row' => $row, 'col' => $col];
+                    }
+                }
+            }
+            
+            if (empty($emptyCells)) {
+                return null; // No hay celdas vacías
+            }
+            
+            // Buscar una celda con pocas posibilidades (más inteligente)
+            $bestCell = null;
+            $minOptions = 10;
+            
+            foreach ($emptyCells as $cell) {
+                $options = $this->getPossibleNumbers($board, $cell['row'], $cell['col']);
+                if (count($options) > 0 && count($options) < $minOptions) {
+                    $minOptions = count($options);
+                    $bestCell = $cell;
+                    $bestCell['options'] = $options;
+                }
+            }
+            
+            // Si no encontramos una celda con pocas opciones, usar una aleatoria
+            if (!$bestCell) {
+                $randomCell = $emptyCells[array_rand($emptyCells)];
+                $options = $this->getPossibleNumbers($board, $randomCell['row'], $randomCell['col']);
+                if (!empty($options)) {
+                    $bestCell = $randomCell;
+                    $bestCell['options'] = $options;
+                }
+            }
+            
+            if (!$bestCell || empty($bestCell['options'])) {
+                return null;
+            }
+            
+            // Seleccionar el primer número válido
+            $number = $bestCell['options'][0];
+            
+            // Generar explicación educativa
+            $explanation = $this->generateExplanation($board, $bestCell['row'], $bestCell['col'], $number, count($bestCell['options']));
+            
+            return [
+                'row' => $bestCell['row'],
+                'col' => $bestCell['col'],
+                'number' => $number,
+                'explanation' => $explanation
+            ];
+            
+        } catch (Exception $e) {
+            error_log("❌ Error generando pista: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Obtener números posibles para una celda
+     */
+    private function getPossibleNumbers($board, $row, $col)
+    {
+        $possible = [];
+        
+        for ($num = 1; $num <= 9; $num++) {
+            if ($this->isValidPlacement($board, $row, $col, $num)) {
+                $possible[] = $num;
+            }
+        }
+        
+        return $possible;
+    }
+    
+    /**
+     * Verificar si un número es válido en una posición
+     */
+    private function isValidPlacement($board, $row, $col, $num)
+    {
+        // Verificar fila
+        for ($c = 0; $c < 9; $c++) {
+            if ($board[$row][$c] === $num) {
+                return false;
+            }
+        }
+        
+        // Verificar columna
+        for ($r = 0; $r < 9; $r++) {
+            if ($board[$r][$col] === $num) {
+                return false;
+            }
+        }
+        
+        // Verificar subcuadro 3x3
+        $startRow = intval($row / 3) * 3;
+        $startCol = intval($col / 3) * 3;
+        
+        for ($r = $startRow; $r < $startRow + 3; $r++) {
+            for ($c = $startCol; $c < $startCol + 3; $c++) {
+                if ($board[$r][$c] === $num) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Generar explicación educativa
+     */
+    private function generateExplanation($board, $row, $col, $number, $optionsCount)
+    {
+        $explanations = [
+            "En la celda fila " . ($row + 1) . ", columna " . ($col + 1) . ", solo puede ir el número $number.",
+            "Observa la fila " . ($row + 1) . " y columna " . ($col + 1) . ": el número $number es la única opción válida.",
+            "En el subcuadro correspondiente, el número $number solo puede ubicarse en esta posición.",
+            "Aplicando la técnica de eliminación, esta celda solo puede contener el número $number."
+        ];
+        
+        if ($optionsCount === 1) {
+            $explanations[] = "Esta celda tiene una única opción posible: el número $number. ¡Es una elección fácil!";
+        } else {
+            $explanations[] = "Esta celda tiene $optionsCount opciones posibles, pero el $number es una buena elección para continuar.";
+        }
+        
+        return $explanations[array_rand($explanations)];
+    }
+    
     private function respondSuccess($data)
     {
         header('Content-Type: application/json');
@@ -173,6 +320,39 @@ try {
     }
     
     if ($method === 'POST') {
+        // POST /hint - Nueva ruta para pistas
+        if ($requestUri === '/hint') {
+            error_log("💡 Ruta de pista detectada: /hint");
+            
+            // Leer datos del POST
+            $input = json_decode(file_get_contents('php://input'), true);
+            $gameId = $input['game_id'] ?? null;
+            $currentState = $input['current_state'] ?? null;
+            
+            if (!$gameId || !$currentState) {
+                header('Content-Type: application/json');
+                echo json_encode(['error' => 'Faltan parámetros requeridos', 'success' => false]);
+                exit;
+            }
+            
+            // Generar pista inteligente
+            $hint = $this->generateIntelligentHint($currentState);
+            
+            if (!$hint) {
+                header('Content-Type: application/json');
+                echo json_encode(['error' => 'No se pudo generar una pista válida', 'success' => false]);
+                exit;
+            }
+            
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'hint' => $hint,
+                'hints_remaining' => 2
+            ]);
+            exit;
+        }
+        
         // POST /puzzle/validate
         if ($requestUri === '/puzzle/validate') {
             // Implementar si es necesario

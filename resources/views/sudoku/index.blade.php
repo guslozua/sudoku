@@ -76,6 +76,11 @@
             const [isPlaying, setIsPlaying] = useState(false);
             const [gameStats, setGameStats] = useState({ hintsUsed: 0, movesCount: 0 });
             const [puzzleCompleted, setPuzzleCompleted] = useState(false);
+            
+            // 💡 ESTADO PARA SISTEMA DE PISTAS
+            const [hintsRemaining, setHintsRemaining] = useState(3);
+            const [lastHint, setLastHint] = useState(null);
+            const [showingHint, setShowingHint] = useState(false);
 
             const API_BASE = '/Sudoku/public/api';
             const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -131,6 +136,11 @@
                             setSelectedNumber(null);
                             setGameStats({ hintsUsed: 0, movesCount: 0 });
                             
+                            // 💡 RESETEAR PISTAS
+                            setHintsRemaining(3);
+                            setLastHint(null);
+                            setShowingHint(false);
+                            
                             console.log('🎮 Puzzle cargado exitosamente desde API');
                             console.log('  - Dificultad:', data.puzzle.difficulty_level);
                             console.log('  - Game ID:', data.game_id);
@@ -175,6 +185,11 @@
                 setTimer(0);
                 setIsPlaying(true);
                 setPuzzleCompleted(false);
+                
+                // 💡 RESETEAR PISTAS
+                setHintsRemaining(3);
+                setLastHint(null);
+                setShowingHint(false);
             };
 
             const stringToBoard = (puzzleString) => {
@@ -208,7 +223,7 @@
 
             const remainingNumbers = calculateRemainingNumbers();
 
-            // ✅ FUNCIONES DE HIGHLIGHTING INTELIGENTE + VALIDACIÓN DE ERRORES
+            // ✅ FUNCIONES DE HIGHLIGHTING INTELIGENTE + VALIDACIÓN DE ERRORES + PISTAS
             const getCellHighlightType = (rowIndex, colIndex) => {
                 const currentValue = board[rowIndex][colIndex];
                 const cellKey = `${rowIndex}-${colIndex}`;
@@ -216,6 +231,11 @@
                 // 0. ERROR - Máxima prioridad (anula todo lo demás)
                 if (errorCells.has(cellKey)) {
                     return 'error';
+                }
+                
+                // 0.5. PISTA - Muy alta prioridad
+                if (showingHint && lastHint && lastHint.row === rowIndex && lastHint.col === colIndex) {
+                    return 'hint';
                 }
                 
                 // 1. Celda seleccionada - alta prioridad
@@ -275,6 +295,11 @@
                             classes += isDarkMode 
                                 ? 'bg-red-900 text-red-200 ring-2 ring-red-500 shadow-lg animate-pulse ' 
                                 : 'bg-red-100 text-red-800 ring-2 ring-red-500 shadow-lg animate-pulse ';
+                            break;
+                        case 'hint':
+                            classes += isDarkMode 
+                                ? 'bg-yellow-900 text-yellow-200 ring-2 ring-yellow-400 shadow-lg animate-bounce ' 
+                                : 'bg-yellow-100 text-yellow-800 ring-2 ring-yellow-400 shadow-lg animate-bounce ';
                             break;
                         case 'selected':
                             classes += isDarkMode 
@@ -495,6 +520,135 @@
                 return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
             };
 
+            // 💡 SISTEMA DE PISTAS INTELIGENTE
+            const getHint = async () => {
+                if (hintsRemaining <= 0) {
+                    alert('⚠️ Se han agotado las pistas para este puzzle (máximo 3 por juego)');
+                    return;
+                }
+                
+                if (puzzleCompleted) {
+                    alert('🎉 El puzzle ya está completado. ¡No necesitas más pistas!');
+                    return;
+                }
+                
+                console.log('💡 Solicitando pista...');
+                console.log('  - Pistas restantes:', hintsRemaining);
+                console.log('  - Game ID:', gameId);
+                
+                try {
+                    // Convertir board actual a string para enviar a la API
+                    const currentBoardString = board.flat().join('');
+                    
+                    const response = await fetch(`${API_BASE}/hint`, {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({
+                            game_id: gameId,
+                            current_state: currentBoardString
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (data.success && data.hint) {
+                            const hint = data.hint;
+                            
+                            console.log('✅ Pista recibida:', hint);
+                            console.log('  - Posición:', `(${hint.row}, ${hint.col})`);
+                            console.log('  - Número:', hint.number);
+                            console.log('  - Explicación:', hint.explanation);
+                            
+                            // Actualizar estado
+                            setLastHint(hint);
+                            setShowingHint(true);
+                            setHintsRemaining(hintsRemaining - 1);
+                            
+                            // Mostrar explicación
+                            alert(`💡 PISTA:\n\n${hint.explanation}\n\n📍 Posición: Fila ${hint.row + 1}, Columna ${hint.col + 1}\n🔢 Número: ${hint.number}\n\nPistas restantes: ${hintsRemaining - 1}/3`);
+                            
+                            // Seleccionar la celda de la pista
+                            setSelectedCell({ row: hint.row, col: hint.col });
+                            
+                            // Ocultar highlighting de pista después de 5 segundos
+                            setTimeout(() => {
+                                setShowingHint(false);
+                            }, 5000);
+                            
+                        } else {
+                            console.error('❌ Error en respuesta de pista:', data);
+                            alert('❌ No se pudo generar una pista. El puzzle podría estar casi completo.');
+                        }
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        console.error('❌ Error del servidor:', errorData);
+                        
+                        if (response.status === 403) {
+                            alert('⚠️ Límite de pistas alcanzado para este puzzle.');
+                        } else {
+                            alert('❌ Error al obtener pista. Inténtalo de nuevo.');
+                        }
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Error conectando con API de pistas:', error);
+                    
+                    // Fallback: generar pista local básica
+                    const localHint = generateLocalHint();
+                    if (localHint) {
+                        setLastHint(localHint);
+                        setShowingHint(true);
+                        setHintsRemaining(hintsRemaining - 1);
+                        
+                        alert(`💡 PISTA (Local):\n\n${localHint.explanation}\n\n📍 Posición: Fila ${localHint.row + 1}, Columna ${localHint.col + 1}\n🔢 Número: ${localHint.number}\n\nPistas restantes: ${hintsRemaining - 1}/3`);
+                        
+                        setSelectedCell({ row: localHint.row, col: localHint.col });
+                        
+                        setTimeout(() => {
+                            setShowingHint(false);
+                        }, 5000);
+                    } else {
+                        alert('❌ No se pudo generar una pista en este momento.');
+                    }
+                }
+            };
+            
+            // 🧠 GENERADOR DE PISTAS LOCAL (FALLBACK)
+            const generateLocalHint = () => {
+                // Buscar una celda vacía
+                const emptyCells = [];
+                for (let row = 0; row < 9; row++) {
+                    for (let col = 0; col < 9; col++) {
+                        if (board[row][col] === 0) {
+                            emptyCells.push({ row, col });
+                        }
+                    }
+                }
+                
+                if (emptyCells.length === 0) {
+                    return null; // No hay celdas vacías
+                }
+                
+                // Seleccionar una celda aleatoria vacía
+                const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                
+                // Encontrar un número posible (simplificado)
+                for (let num = 1; num <= 9; num++) {
+                    const conflict = hasConflict(randomCell.row, randomCell.col, num);
+                    if (!conflict) {
+                        return {
+                            row: randomCell.row,
+                            col: randomCell.col,
+                            number: num,
+                            explanation: `En la celda fila ${randomCell.row + 1}, columna ${randomCell.col + 1}, puedes colocar el número ${num}.`
+                        };
+                    }
+                }
+                
+                return null;
+            };
+            
             const handleDifficultyChange = (newDifficulty) => {
                 setDifficulty(newDifficulty);
                 loadNewPuzzle(newDifficulty);
@@ -803,6 +957,25 @@
                                     >
                                         🗑️ Borrar {canErase ? '(Habilitado)' : '(Deshabilitado)'}
                                     </button>
+                                    
+                                    {/* 💡 BOTÓN DE PISTAS */}
+                                    <button
+                                        onClick={getHint}
+                                        disabled={hintsRemaining <= 0 || puzzleCompleted}
+                                        className={`
+                                            w-full h-12 rounded-lg font-semibold number-button mt-2
+                                            ${hintsRemaining <= 0 || puzzleCompleted
+                                                ? isDarkMode 
+                                                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
+                                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                : isDarkMode 
+                                                    ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+                                                    : 'bg-yellow-500 text-white hover:bg-yellow-600'
+                                            }
+                                        `}
+                                    >
+                                        💡 Pista ({hintsRemaining}/3)
+                                    </button>
 
                                     {/* Estadísticas */}
                                     <div className={`mt-4 p-3 rounded-lg ${
@@ -825,6 +998,12 @@
                                             <div className="flex justify-between">
                                                 <span>Movimientos:</span>
                                                 <span className="font-mono">{gameStats.movesCount}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Pistas usadas:</span>
+                                                <span className={`font-mono ${(3 - hintsRemaining) > 0 ? 'text-yellow-600' : ''}`}>
+                                                    {3 - hintsRemaining}/3
+                                                </span>
                                             </div>
                                         </div>
                                     </div>

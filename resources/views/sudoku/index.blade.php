@@ -88,6 +88,14 @@
             const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
             const [showContinueDialog, setShowContinueDialog] = useState(false);
             const [savedGameData, setSavedGameData] = useState(null);
+            
+            // 🏆 ESTADO PARA SISTEMA DE LOGROS
+            const [achievements, setAchievements] = useState([]);
+            const [newAchievements, setNewAchievements] = useState([]);
+            const [showAchievementModal, setShowAchievementModal] = useState(false);
+            const [showAchievementsGallery, setShowAchievementsGallery] = useState(false);
+            const [unlockedAchievement, setUnlockedAchievement] = useState(null);
+            const [mistakesCount, setMistakesCount] = useState(0);
 
             const API_BASE = '/Sudoku/public/api';
             const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -447,7 +455,7 @@
                         }));
                     }
                     
-                    checkAndCompletePuzzle(newBoard);
+                    checkAndCompletePuzzleWithAchievements(newBoard);
                 } else {
                     console.log('❌ No se puede colocar número:');
                     console.log('  - selectedCell:', !!selectedCell);
@@ -947,6 +955,131 @@
                 window.addEventListener('keydown', handleKeyPress);
                 return () => window.removeEventListener('keydown', handleKeyPress);
             }, [selectedCell, puzzleCompleted]);
+            
+            // 🏆 FUNCIONES DEL SISTEMA DE LOGROS
+            
+            // Cargar logros del usuario
+            const loadUserAchievements = async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/achievements`, {
+                        method: 'GET',
+                        headers: getHeaders(),
+                        credentials: 'same-origin'
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success) {
+                            setAchievements(data.achievements);
+                            console.log('🏆 Logros cargados:', data.achievements.length);
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Error cargando logros:', error);
+                }
+            };
+            
+            // Completar puzzle con verificación de logros
+            const completePuzzleWithAchievements = async (finalBoard) => {
+                if (!gameId) {
+                    console.log('❌ No hay gameId para completar');
+                    return;
+                }
+                
+                console.log('🏆 Completando puzzle con verificación de logros...');
+                
+                try {
+                    const response = await fetch(`${API_BASE}/game/complete`, {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            game_id: gameId,
+                            current_state: finalBoard.flat().join(''),
+                            time_spent: timer,
+                            moves_count: gameStats.movesCount,
+                            hints_used: gameStats.hintsUsed,
+                            mistakes_count: mistakesCount
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            console.log('✅ Puzzle completado exitosamente');
+                            console.log('🏆 Nuevos logros:', data.new_achievements);
+                            
+                            // Si hay nuevos logros, mostrarlos
+                            if (data.new_achievements && data.new_achievements.length > 0) {
+                                setNewAchievements(data.new_achievements);
+                                setUnlockedAchievement(data.new_achievements[0]); // Mostrar el primero
+                                setShowAchievementModal(true);
+                                
+                                // Recargar todos los logros
+                                loadUserAchievements();
+                            }
+                            
+                            // Mostrar mensaje de felicitación
+                            setTimeout(() => {
+                                alert(`🎉 ¡FELICITACIONES! 🎉\n\n✅ Puzzle completado en: ${formatTime(timer)}\n🎯 Dificultad: ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}\n🎮 Movimientos: ${gameStats.movesCount}\n${data.new_achievements.length > 0 ? `🏆 ¡${data.new_achievements.length} nuevo${data.new_achievements.length > 1 ? 's' : ''} logro${data.new_achievements.length > 1 ? 's' : ''} desbloqueado${data.new_achievements.length > 1 ? 's' : ''}!` : '⭐ ¡Excelente trabajo!'}`);
+                            }, 100);
+                        }
+                    } else {
+                        throw new Error('Error al completar puzzle');
+                    }
+                } catch (error) {
+                    console.error('❌ Error completando puzzle:', error);
+                    // Fallback al método anterior
+                    alert(`🎉 ¡FELICITACIONES! 🎉\n\n✅ Puzzle completado en: ${formatTime(timer)}\n🎯 Dificultad: ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}\n🎮 Movimientos: ${gameStats.movesCount}\n⭐ ¡Excelente trabajo!`);
+                }
+            };
+            
+            // Cerrar modal de logro y mostrar siguiente si hay más
+            const closeAchievementModal = () => {
+                setShowAchievementModal(false);
+                setUnlockedAchievement(null);
+                
+                // Si hay más logros pendientes, mostrar el siguiente
+                if (newAchievements.length > 1) {
+                    const nextAchievements = newAchievements.slice(1);
+                    setNewAchievements(nextAchievements);
+                    
+                    setTimeout(() => {
+                        setUnlockedAchievement(nextAchievements[0]);
+                        setShowAchievementModal(true);
+                    }, 500);
+                } else {
+                    setNewAchievements([]);
+                }
+            };
+            
+            // Mostrar galería de logros
+            const toggleAchievementsGallery = () => {
+                if (!showAchievementsGallery) {
+                    loadUserAchievements(); // Recargar logros antes de mostrar
+                }
+                setShowAchievementsGallery(!showAchievementsGallery);
+            };
+            
+            // Modificar la función existente checkAndCompletePuzzle para usar la nueva lógica
+            const checkAndCompletePuzzleWithAchievements = (newBoard) => {
+                if (isPuzzleComplete(newBoard)) {
+                    setPuzzleCompleted(true);
+                    setIsPlaying(false);
+                    
+                    // Usar la nueva función con logros
+                    completePuzzleWithAchievements(newBoard);
+                    
+                    return true;
+                }
+                return false;
+            };
+            
+            // Cargar logros al inicializar
+            useEffect(() => {
+                loadUserAchievements();
+            }, []);
 
             if (loading) {
                 return (
@@ -1025,6 +1158,208 @@
                                     >
                                         🆕 Nueva
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* 🏆 MODAL DE LOGRO DESBLOQUEADO */}
+                    {showAchievementModal && unlockedAchievement && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className={`p-6 rounded-lg shadow-xl max-w-md w-full mx-4 text-center ${
+                                isDarkMode ? 'bg-gray-800 border border-gray-600' : 'bg-white border border-gray-200'
+                            }`}>
+                                <div className="text-6xl mb-4 animate-bounce">{unlockedAchievement.icon}</div>
+                                
+                                <h3 className="text-xl font-bold mb-2 text-yellow-600">
+                                    🎉 ¡Logro Desbloqueado!
+                                </h3>
+                                
+                                <h4 className="text-lg font-semibold mb-3">
+                                    {unlockedAchievement.name}
+                                </h4>
+                                
+                                <p className={`text-sm mb-6 ${
+                                    isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                                }`}>
+                                    {unlockedAchievement.description}
+                                </p>
+                                
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={closeAchievementModal}
+                                        className={`flex-1 py-2 px-4 rounded-lg font-medium ${
+                                            isDarkMode 
+                                                ? 'bg-yellow-600 hover:bg-yellow-700 text-white' 
+                                                : 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                                        }`}
+                                    >
+                                        🎉 ¡Genial!
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => {
+                                            closeAchievementModal();
+                                            toggleAchievementsGallery();
+                                        }}
+                                        className={`flex-1 py-2 px-4 rounded-lg font-medium border ${
+                                            isDarkMode 
+                                                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                                                : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300'
+                                        }`}
+                                    >
+                                        🏆 Ver todos
+                                    </button>
+                                </div>
+                                
+                                {newAchievements.length > 1 && (
+                                    <p className={`text-xs mt-3 ${
+                                        isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                                    }`}>
+                                        🎆 +{newAchievements.length - 1} logro{newAchievements.length > 2 ? 's' : ''} más
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* 🏆 GALERÍA DE LOGROS */}
+                    {showAchievementsGallery && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className={`rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden ${
+                                isDarkMode ? 'bg-gray-800 border border-gray-600' : 'bg-white border border-gray-200'
+                            }`}>
+                                <div className={`p-6 border-b ${
+                                    isDarkMode ? 'border-gray-700' : 'border-gray-200'
+                                }`}>
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-2xl font-bold flex items-center gap-2">
+                                            🏆 Logros
+                                            <span className={`text-sm px-2 py-1 rounded-md ${
+                                                isDarkMode ? 'bg-yellow-800 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
+                                            }`}>
+                                                {achievements.filter(a => a.is_completed).length}/{achievements.length}
+                                            </span>
+                                        </h3>
+                                        
+                                        <button
+                                            onClick={toggleAchievementsGallery}
+                                            className={`p-2 rounded-lg ${
+                                                isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div className="p-6 overflow-y-auto max-h-[70vh]">
+                                    {achievements.length === 0 ? (
+                                        <div className="text-center py-12">
+                                            <div className="text-6xl mb-4">🏆</div>
+                                            <p className={`text-lg ${
+                                                isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                                            }`}>
+                                                ¡Los logros se cargarán cuando completes tu primer puzzle!
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {achievements.map((achievement, index) => {
+                                                const isCompleted = achievement.is_completed;
+                                                const isLocked = !isCompleted;
+                                                
+                                                return (
+                                                    <div
+                                                        key={achievement.id || index}
+                                                        className={`p-4 rounded-lg border transition-all ${
+                                                            isCompleted
+                                                                ? isDarkMode 
+                                                                    ? 'bg-yellow-900 border-yellow-600 shadow-lg' 
+                                                                    : 'bg-yellow-50 border-yellow-300 shadow-lg'
+                                                                : isDarkMode 
+                                                                    ? 'bg-gray-700 border-gray-600 opacity-60' 
+                                                                    : 'bg-gray-50 border-gray-300 opacity-60'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-start gap-3">
+                                                            <div className={`text-2xl ${
+                                                                isLocked ? 'grayscale opacity-50' : ''
+                                                            }`}>
+                                                                {isLocked ? '🔒' : achievement.icon}
+                                                            </div>
+                                                            
+                                                            <div className="flex-1">
+                                                                <h4 className={`font-semibold ${
+                                                                    isCompleted 
+                                                                        ? isDarkMode ? 'text-yellow-200' : 'text-yellow-800'
+                                                                        : isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                                                                }`}>
+                                                                    {isLocked ? '???' : achievement.name}
+                                                                </h4>
+                                                                
+                                                                <p className={`text-sm mt-1 ${
+                                                                    isCompleted 
+                                                                        ? isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
+                                                                        : isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                                                                }`}>
+                                                                    {isLocked ? 'Logro bloqueado - completa puzzles para desbloquearlo' : achievement.description}
+                                                                </p>
+                                                                
+                                                                {isCompleted && achievement.unlocked_at && (
+                                                                    <p className={`text-xs mt-2 ${
+                                                                        isDarkMode ? 'text-yellow-400' : 'text-yellow-600'
+                                                                    }`}>
+                                                                        ✨ Desbloqueado el {new Date(achievement.unlocked_at).toLocaleDateString()}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            
+                                                            {isCompleted && (
+                                                                <div className="text-green-500 text-xl">
+                                                                    ✓
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    
+                                    {achievements.length > 0 && (
+                                        <div className={`mt-6 p-4 rounded-lg border ${
+                                            isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-300'
+                                        }`}>
+                                            <h4 className="font-semibold mb-2">📊 Progreso General</h4>
+                                            
+                                            <div className={`w-full bg-gray-300 rounded-full h-3 mb-3 ${
+                                                isDarkMode ? 'bg-gray-600' : 'bg-gray-300'
+                                            }`}>
+                                                <div 
+                                                    className="bg-yellow-500 h-3 rounded-full transition-all duration-500"
+                                                    style={{
+                                                        width: `${(achievements.filter(a => a.is_completed).length / achievements.length) * 100}%`
+                                                    }}
+                                                ></div>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                                <div>
+                                                    <span className="font-medium">Completados:</span>
+                                                    <span className="ml-2 font-mono">
+                                                        {achievements.filter(a => a.is_completed).length}/{achievements.length}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span className="font-medium">Progreso:</span>
+                                                    <span className="ml-2 font-mono">
+                                                        {Math.round((achievements.filter(a => a.is_completed).length / achievements.length) * 100)}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1114,6 +1449,26 @@
                                         title="Test API"
                                     >
                                         🧪
+                                    </button>
+                                    
+                                    {/* 🏆 BOTÓN DE LOGROS */}
+                                    <button
+                                        onClick={toggleAchievementsGallery}
+                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors relative ${
+                                            isDarkMode 
+                                                ? 'bg-yellow-600 hover:bg-yellow-700 text-white' 
+                                                : 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                                        }`}
+                                        title="Ver logros"
+                                    >
+                                        🏆 Logros
+                                        {achievements.filter(a => a.is_completed).length > 0 && (
+                                            <span className={`absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
+                                                isDarkMode ? 'bg-yellow-400 text-yellow-900' : 'bg-yellow-300 text-yellow-800'
+                                            }`}>
+                                                {achievements.filter(a => a.is_completed).length}
+                                            </span>
+                                        )}
                                     </button>
                                     
                                     <button

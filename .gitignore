@@ -45,4 +45,6 @@ test_*.php
 debug_*.php
 fix_*.php
 complete_fix_*.php
+setup_*.php
+update_*.php
 cleanup.sh

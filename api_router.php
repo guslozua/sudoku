@@ -276,12 +276,238 @@ class SudokuController
         exit;
     }
     
+    /**
+     * Verificar y desbloquear logros del usuario
+     */
+    public function checkAndUnlockAchievements($userId, $gameData)
+    {
+        try {
+            $newAchievements = [];
+            
+            // Obtener estadísticas del usuario
+            $stats = $this->getUserStats($userId);
+            
+            // Verificar cada tipo de logro
+            $newAchievements = array_merge($newAchievements, $this->checkCompletionAchievements($userId, $stats));
+            $newAchievements = array_merge($newAchievements, $this->checkSpeedAchievements($userId, $gameData));
+            $newAchievements = array_merge($newAchievements, $this->checkDifficultyAchievements($userId, $gameData));
+            $newAchievements = array_merge($newAchievements, $this->checkStrategyAchievements($userId, $gameData));
+            $newAchievements = array_merge($newAchievements, $this->checkPrecisionAchievements($userId, $gameData));
+            
+            return $newAchievements;
+        } catch (Exception $e) {
+            error_log("❌ Error checking achievements: " . $e->getMessage());
+            return [];
+        }
+    }
+    
     private function respondError($message, $code = 400)
     {
         http_response_code($code);
         header('Content-Type: application/json');
         echo json_encode(['error' => $message, 'success' => false]);
         exit;
+    }
+    
+    /**
+     * Obtener estadísticas del usuario
+     */
+    private function getUserStats($userId)
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT 
+                COUNT(*) as total_completed,
+                COUNT(CASE WHEN p.difficulty_level = 'easy' THEN 1 END) as easy_completed,
+                COUNT(CASE WHEN p.difficulty_level = 'medium' THEN 1 END) as medium_completed,
+                COUNT(CASE WHEN p.difficulty_level = 'hard' THEN 1 END) as hard_completed,
+                COUNT(CASE WHEN p.difficulty_level = 'expert' THEN 1 END) as expert_completed,
+                COUNT(CASE WHEN p.difficulty_level = 'master' THEN 1 END) as master_completed,
+                SUM(g.hints_used) as total_hints_used,
+                MIN(g.completion_time) as best_time
+            FROM games g
+            JOIN puzzles p ON g.puzzle_id = p.id
+            WHERE g.user_id = ? AND g.status = 'completed'
+        ");
+        $stmt->execute([$userId]);
+        return $stmt->fetch();
+    }
+    
+    /**
+     * Verificar logros de completado
+     */
+    private function checkCompletionAchievements($userId, $stats)
+    {
+        $achievements = [];
+        
+        // Primer puzzle completado
+        if ($stats['total_completed'] >= 1) {
+            $achievements[] = $this->unlockAchievement($userId, 'first_step');
+        }
+        
+        // 10 puzzles completados
+        if ($stats['total_completed'] >= 10) {
+            $achievements[] = $this->unlockAchievement($userId, 'puzzle_master');
+        }
+        
+        // 50 puzzles completados
+        if ($stats['total_completed'] >= 50) {
+            $achievements[] = $this->unlockAchievement($userId, 'sudoku_legend');
+        }
+        
+        // 5 puzzles fáciles
+        if ($stats['easy_completed'] >= 5) {
+            $achievements[] = $this->unlockAchievement($userId, 'easy_champion');
+        }
+        
+        return array_filter($achievements);
+    }
+    
+    /**
+     * Verificar logros de velocidad
+     */
+    private function checkSpeedAchievements($userId, $gameData)
+    {
+        $achievements = [];
+        
+        if (isset($gameData['completion_time'])) {
+            // Menos de 5 minutos (300 segundos)
+            if ($gameData['completion_time'] <= 300) {
+                $achievements[] = $this->unlockAchievement($userId, 'speed_demon');
+            }
+            
+            // Menos de 3 minutos (180 segundos)
+            if ($gameData['completion_time'] <= 180) {
+                $achievements[] = $this->unlockAchievement($userId, 'lightning_fast');
+            }
+        }
+        
+        return array_filter($achievements);
+    }
+    
+    /**
+     * Verificar logros de dificultad
+     */
+    private function checkDifficultyAchievements($userId, $gameData)
+    {
+        $achievements = [];
+        
+        if (isset($gameData['difficulty'])) {
+            // Primer Expert
+            if ($gameData['difficulty'] === 'expert') {
+                $achievements[] = $this->unlockAchievement($userId, 'expert_challenger');
+            }
+            
+            // Primer Master
+            if ($gameData['difficulty'] === 'master') {
+                $achievements[] = $this->unlockAchievement($userId, 'master_conqueror');
+            }
+        }
+        
+        return array_filter($achievements);
+    }
+    
+    /**
+     * Verificar logros de estrategia
+     */
+    private function checkStrategyAchievements($userId, $gameData)
+    {
+        $achievements = [];
+        
+        // Sin pistas
+        if (isset($gameData['hints_used']) && $gameData['hints_used'] == 0) {
+            $achievements[] = $this->unlockAchievement($userId, 'strategic_mind');
+        }
+        
+        return array_filter($achievements);
+    }
+    
+    /**
+     * Verificar logros de precisión
+     */
+    private function checkPrecisionAchievements($userId, $gameData)
+    {
+        $achievements = [];
+        
+        // Sin errores
+        if (isset($gameData['mistakes_count']) && $gameData['mistakes_count'] == 0) {
+            $achievements[] = $this->unlockAchievement($userId, 'perfect_game');
+        }
+        
+        // Menos de 100 movimientos
+        if (isset($gameData['moves_count']) && $gameData['moves_count'] < 100) {
+            $achievements[] = $this->unlockAchievement($userId, 'efficient_solver');
+        }
+        
+        return array_filter($achievements);
+    }
+    
+    /**
+     * Desbloquear un logro específico
+     */
+    private function unlockAchievement($userId, $achievementKey)
+    {
+        try {
+            // Verificar si ya tiene el logro
+            $stmt = $this->pdo->prepare("
+                SELECT ua.id 
+                FROM user_achievements ua 
+                JOIN achievements a ON ua.achievement_id = a.id 
+                WHERE ua.user_id = ? AND a.key_name = ? AND ua.is_completed = 1
+            ");
+            $stmt->execute([$userId, $achievementKey]);
+            
+            if ($stmt->fetch()) {
+                return null; // Ya lo tiene
+            }
+            
+            // Obtener el logro
+            $stmt = $this->pdo->prepare("SELECT * FROM achievements WHERE key_name = ?");
+            $stmt->execute([$achievementKey]);
+            $achievement = $stmt->fetch();
+            
+            if (!$achievement) {
+                return null;
+            }
+            
+            // Desbloquear el logro
+            $stmt = $this->pdo->prepare("
+                INSERT INTO user_achievements (user_id, achievement_id, is_completed, unlocked_at) 
+                VALUES (?, ?, 1, NOW())
+                ON DUPLICATE KEY UPDATE is_completed = 1, unlocked_at = NOW()
+            ");
+            $stmt->execute([$userId, $achievement['id']]);
+            
+            error_log("🏆 Logro desbloqueado: {$achievement['name']} para usuario $userId");
+            
+            return $achievement;
+        } catch (Exception $e) {
+            error_log("❌ Error unlocking achievement: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Obtener todos los logros del usuario
+     */
+    public function getUserAchievements($userId)
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT 
+                    a.*,
+                    ua.is_completed,
+                    ua.unlocked_at,
+                    ua.current_progress
+                FROM achievements a
+                LEFT JOIN user_achievements ua ON a.id = ua.achievement_id AND ua.user_id = ?
+                ORDER BY ua.is_completed DESC, a.category, a.id
+            ");
+            $stmt->execute([$userId]);
+            return $stmt->fetchAll();
+        } catch (Exception $e) {
+            error_log("❌ Error getting user achievements: " . $e->getMessage());
+            return [];
+        }
     }
 }
 
@@ -323,6 +549,55 @@ try {
             error_log("🎯 Ruta detectada: puzzle/new/$difficulty");
             $controller->getNewPuzzle($difficulty);
             exit;
+        }
+        
+        // GET /achievements
+        if ($requestUri === '/achievements') {
+            error_log("🏆 Ruta de logros detectada: /achievements");
+            
+            try {
+                // Obtener ID de usuario de sesión directamente
+                $sessionId = $_SESSION['sudoku_session_id'] ?? null;
+                if (!$sessionId) {
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'No hay sesión activa'
+                    ]);
+                    exit;
+                }
+                
+                // Buscar usuario por session_id
+                $stmt = $controller->getPdo()->prepare("SELECT id FROM users WHERE session_id = ?");
+                $stmt->execute([$sessionId]);
+                $user = $stmt->fetch();
+                
+                if (!$user) {
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'Usuario no encontrado'
+                    ]);
+                    exit;
+                }
+                
+                $userId = $user['id'];
+                
+                // Obtener logros del usuario
+                $achievements = $controller->getUserAchievements($userId);
+                
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true,
+                    'achievements' => $achievements
+                ]);
+                exit;
+            } catch (Exception $e) {
+                error_log("❌ Error obteniendo logros: " . $e->getMessage());
+                header('Content-Type: application/json');
+                echo json_encode(['error' => 'Error al obtener logros: ' . $e->getMessage(), 'success' => false]);
+                exit;
+            }
         }
         
         // GET /game/current
@@ -437,6 +712,108 @@ try {
                 'hints_remaining' => 2
             ]);
             exit;
+        }
+        
+        // POST /game/complete
+        if ($requestUri === '/game/complete') {
+            error_log("🏆 Ruta de completar puzzle detectada: /game/complete");
+            
+            // Leer datos del POST
+            $input = json_decode(file_get_contents('php://input'), true);
+            $gameId = $input['game_id'] ?? null;
+            $currentState = $input['current_state'] ?? null;
+            $timeSpent = $input['time_spent'] ?? 0;
+            $movesCount = $input['moves_count'] ?? 0;
+            $hintsUsed = $input['hints_used'] ?? 0;
+            $mistakesCount = $input['mistakes_count'] ?? 0;
+            
+            if (!$gameId || !$currentState) {
+                header('Content-Type: application/json');
+                echo json_encode(['error' => 'Faltan parámetros requeridos', 'success' => false]);
+                exit;
+            }
+            
+            try {
+                // Obtener usuario actual
+                $sessionId = $_SESSION['sudoku_session_id'] ?? null;
+                if (!$sessionId) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['error' => 'No hay sesión activa', 'success' => false]);
+                    exit;
+                }
+                
+                $stmt = $controller->getPdo()->prepare("SELECT id FROM users WHERE session_id = ?");
+                $stmt->execute([$sessionId]);
+                $user = $stmt->fetch();
+                
+                if (!$user) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['error' => 'Usuario no encontrado', 'success' => false]);
+                    exit;
+                }
+                
+                $userId = $user['id'];
+                
+                // Obtener información del juego y puzzle
+                $stmt = $controller->getPdo()->prepare("
+                    SELECT g.*, p.difficulty_level, p.solution_string 
+                    FROM games g 
+                    JOIN puzzles p ON g.puzzle_id = p.id 
+                    WHERE g.id = ? AND g.user_id = ?
+                ");
+                $stmt->execute([$gameId, $userId]);
+                $game = $stmt->fetch();
+                
+                if (!$game) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['error' => 'Juego no encontrado', 'success' => false]);
+                    exit;
+                }
+                
+                // Marcar juego como completado
+                $stmt = $controller->getPdo()->prepare("
+                    UPDATE games SET 
+                        current_state = ?, 
+                        time_spent = ?, 
+                        moves_count = ?, 
+                        hints_used = ?,
+                        mistakes_count = ?,
+                        status = 'completed',
+                        completion_time = ?,
+                        completed_at = NOW(),
+                        last_played_at = NOW()
+                    WHERE id = ?
+                ");
+                $stmt->execute([$currentState, $timeSpent, $movesCount, $hintsUsed, $mistakesCount, $timeSpent, $gameId]);
+                
+                // Verificar logros
+                $gameData = [
+                    'completion_time' => $timeSpent,
+                    'moves_count' => $movesCount,
+                    'hints_used' => $hintsUsed,
+                    'mistakes_count' => $mistakesCount,
+                    'difficulty' => $game['difficulty_level']
+                ];
+                
+                $newAchievements = $controller->checkAndUnlockAchievements($userId, $gameData);
+                
+                error_log("🏆 Logros verificados - Nuevos logros: " . count($newAchievements));
+                
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Puzzle completado exitosamente',
+                    'completion_time' => $timeSpent,
+                    'new_achievements' => $newAchievements,
+                    'completed_at' => date('Y-m-d H:i:s')
+                ]);
+                exit;
+            } catch (Exception $e) {
+                error_log("❌ Error completando puzzle: " . $e->getMessage());
+                header('Content-Type: application/json');
+                echo json_encode(['error' => 'Error al completar puzzle: ' . $e->getMessage(), 'success' => false]);
+                exit;
+            }
         }
         
         // POST /game/save

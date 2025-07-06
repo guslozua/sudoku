@@ -13,6 +13,16 @@ Aplicación de Sudoku profesional con características avanzadas y auto-guardado
 - 💡 **Sistema de Pistas** - Explicaciones educativas inteligentes (máx. 3 por puzzle)
 - 💾 **Auto-guardado** - Progreso guardado automáticamente cada 10 segundos
 - 🔄 **Recuperación de Partidas** - Continúa exactamente donde lo dejaste
+- 🏆 **Sistema de Logros** - 14 logros gamificados con celebraciones
+
+### 🏆 Sistema de Logros Completo
+- 🥇 **Logros de Completado** - Primer paso, 10 puzzles, 50 puzzles
+- 🏃‍♂️ **Logros de Velocidad** - Demonio de velocidad, rayo veloz
+- 🎯 **Logros de Dificultad** - Desafiante experto, conquistador maestro
+- 🧠 **Logros de Estrategia** - Mente estratégica, sin pistas
+- 💎 **Logros de Precisión** - Juego perfecto, solucionador eficiente
+- 🎊 **Celebraciones Animadas** - Modales de logro con animaciones
+- 📊 **Galería Visual** - Progreso completo con barras y estadísticas
 
 ### 🎨 Experiencia de Usuario
 - 🌙 **Modo Oscuro/Claro** - Diseño adaptativo
@@ -80,12 +90,18 @@ GET  /api/puzzle/new/{difficulty}    - Nuevo puzzle
 ### **Juego:**
 ```
 POST /api/game/save                  - Guardar progreso
+POST /api/game/complete              - Completar puzzle con verificación de logros
 GET  /api/game/current               - Juego actual
 ```
 
 ### **Pistas:**
 ```
 POST /api/hint                       - Obtener pista
+```
+
+### **Logros:**
+```
+GET  /api/achievements               - Obtener logros del usuario
 ```
 
 ## 🎨 Personalización
@@ -129,11 +145,16 @@ POST /api/hint                       - Obtener pista
 
 ## 🏆 Roadmap
 
-### **Versión 1.2 (Próxima):**
-- 🏆 Sistema de logros y badges
-- 🎵 Sonidos sutiles para feedback
-- 📊 Gráficos de progreso detallados
-- 🌐 Multi-idioma (español/inglés)
+### **Versión 1.2 (Actual):**
+- ✅ 🏆 **Sistema de logros** completo con 14 logros
+- ✅ 🎊 **Celebraciones animadas** para logros desbloqueados
+- ✅ 📊 **Galería visual** con progreso y estadísticas
+- ✅ 🎮 **Gamificación** completa para mayor engagement
+
+### **Versión 1.3 (Próxima):**
+- 🎵 **Sonidos sutiles** para feedback
+- 📊 **Gráficos de progreso** detallados
+- 🌐 **Multi-idioma** (español/inglés)
 
 ### **Versión 1.3 (Futura):**
 - 👥 Modo multijugador cooperativo

@@ -96,6 +96,27 @@
             const [showAchievementsGallery, setShowAchievementsGallery] = useState(false);
             const [unlockedAchievement, setUnlockedAchievement] = useState(null);
             const [mistakesCount, setMistakesCount] = useState(0);
+            
+            // 🎵 ESTADO PARA SISTEMA DE SONIDOS
+            const [soundEnabled, setSoundEnabled] = useState(() => {
+                // Cargar preferencia de localStorage
+                const saved = localStorage.getItem('sudoku_sound_enabled');
+                return saved !== null ? JSON.parse(saved) : true;
+            });
+            const [soundVolume, setSoundVolume] = useState(() => {
+                // Cargar volumen de localStorage
+                const saved = localStorage.getItem('sudoku_sound_volume');
+                return saved !== null ? parseFloat(saved) : 0.3;
+            });
+            
+            // Guardar preferencias de sonido
+            useEffect(() => {
+                localStorage.setItem('sudoku_sound_enabled', JSON.stringify(soundEnabled));
+            }, [soundEnabled]);
+            
+            useEffect(() => {
+                localStorage.setItem('sudoku_sound_volume', soundVolume.toString());
+            }, [soundVolume]);
 
             const API_BASE = '/Sudoku/public/api';
             const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -428,6 +449,9 @@
                     
                     setBoard(newBoard);
                     
+                    // 🎵 REPRODUCIR SONIDO AL COLOCAR NÚMERO
+                    playSound.place();
+                    
                     // 🔴 VERIFICAR ERRORES DESPUÉS DE COLOCAR NÚMERO
                     setTimeout(() => {
                         const newErrorCells = getAllErrorCells();
@@ -437,6 +461,9 @@
                                 const [r, c] = cellKey.split('-').map(Number);
                                 console.log(`  - Celda (${r}, ${c}) con valor ${board[r][c]}`);
                             });
+                            
+                            // 🎵 REPRODUCIR SONIDO DE ERROR
+                            playSound.error();
                         } else {
                             console.log(`✅ Sin errores después de colocar ${number}`);
                         }
@@ -488,6 +515,10 @@
                 console.log(`Borrando número ${newBoard[selectedCell.row][selectedCell.col]} de celda (${selectedCell.row}, ${selectedCell.col})`);
                 newBoard[selectedCell.row][selectedCell.col] = 0;
                 setBoard(newBoard);
+                
+                // 🎵 REPRODUCIR SONIDO AL BORRAR
+                playSound.erase();
+                
                 setGameStats(prev => ({ 
                     ...prev, 
                     movesCount: prev.movesCount + 1 
@@ -778,6 +809,9 @@
                             setShowingHint(true);
                             setHintsRemaining(hintsRemaining - 1);
                             
+                            // 🎵 REPRODUCIR SONIDO DE PISTA
+                            playSound.hint();
+                            
                             // Mostrar explicación
                             alert(`💡 PISTA:\n\n${hint.explanation}\n\n📍 Posición: Fila ${hint.row + 1}, Columna ${hint.col + 1}\n🔢 Número: ${hint.number}\n\nPistas restantes: ${hintsRemaining - 1}/3`);
                             
@@ -956,7 +990,94 @@
                 return () => window.removeEventListener('keydown', handleKeyPress);
             }, [selectedCell, puzzleCompleted]);
             
-            // 🏆 FUNCIONES DEL SISTEMA DE LOGROS
+            // 🎵 SISTEMA DE SONIDOS
+            
+            // Crear contexto de audio (solo cuando se necesite por primera vez)
+            const [audioContext, setAudioContext] = useState(null);
+            
+            // Inicializar contexto de audio
+            const initAudioContext = () => {
+                if (!audioContext && soundEnabled) {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    setAudioContext(ctx);
+                    return ctx;
+                }
+                return audioContext;
+            };
+            
+            // Generar sonido de frecuencia específica
+            const playTone = (frequency, duration = 0.1, type = 'sine') => {
+                if (!soundEnabled) return;
+                
+                const ctx = initAudioContext();
+                if (!ctx) return;
+                
+                try {
+                    const oscillator = ctx.createOscillator();
+                    const gainNode = ctx.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(ctx.destination);
+                    
+                    oscillator.frequency.value = frequency;
+                    oscillator.type = type;
+                    
+                    // Envelope para evitar clicks
+                    gainNode.gain.setValueAtTime(0, ctx.currentTime);
+                    gainNode.gain.linearRampToValueAtTime(soundVolume, ctx.currentTime + 0.01);
+                    gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+                    
+                    oscillator.start(ctx.currentTime);
+                    oscillator.stop(ctx.currentTime + duration);
+                } catch (error) {
+                    console.log('🎵 Audio no disponible:', error.message);
+                }
+            };
+            
+            // Sonidos específicos
+            const playSound = {
+                // 🔢 Sonido al colocar número (nota musical suave)
+                place: () => playTone(440, 0.1, 'sine'), // La 4
+                
+                // ❌ Sonido de error (disonante pero sutil)
+                error: () => playTone(200, 0.15, 'sawtooth'),
+                
+                // 💡 Sonido de pista (campanita)
+                hint: () => {
+                    playTone(800, 0.1, 'sine');
+                    setTimeout(() => playTone(1000, 0.1, 'sine'), 100);
+                },
+                
+                // 🎉 Sonido de éxito (acorde ascendente)
+                success: () => {
+                    playTone(523, 0.15, 'sine'); // Do 5
+                    setTimeout(() => playTone(659, 0.15, 'sine'), 100); // Mi 5
+                    setTimeout(() => playTone(784, 0.2, 'sine'), 200); // Sol 5
+                },
+                
+                // 🏆 Sonido de logro (fanfarria)
+                achievement: () => {
+                    playTone(523, 0.1, 'sine'); // Do
+                    setTimeout(() => playTone(659, 0.1, 'sine'), 80); // Mi
+                    setTimeout(() => playTone(784, 0.1, 'sine'), 160); // Sol
+                    setTimeout(() => playTone(1047, 0.2, 'sine'), 240); // Do octava
+                },
+                
+                // 🔄 Sonido de acción general (click suave)
+                click: () => playTone(600, 0.05, 'sine'),
+                
+                // 🗑️ Sonido de borrar
+                erase: () => playTone(300, 0.08, 'triangle')
+            };
+            
+            // Toggle de sonido
+            const toggleSound = () => {
+                setSoundEnabled(!soundEnabled);
+                if (!soundEnabled) {
+                    // Reproducir sonido de confirmación al activar
+                    setTimeout(() => playSound.click(), 100);
+                }
+            };
             
             // Cargar logros del usuario
             const loadUserAchievements = async () => {
@@ -1010,11 +1131,17 @@
                             console.log('✅ Puzzle completado exitosamente');
                             console.log('🏆 Nuevos logros:', data.new_achievements);
                             
+                            // 🎵 REPRODUCIR SONIDO DE ÉXITO
+                            playSound.success();
+                            
                             // Si hay nuevos logros, mostrarlos
                             if (data.new_achievements && data.new_achievements.length > 0) {
                                 setNewAchievements(data.new_achievements);
                                 setUnlockedAchievement(data.new_achievements[0]); // Mostrar el primero
                                 setShowAchievementModal(true);
+                                
+                                // 🎵 REPRODUCIR SONIDO DE LOGRO
+                                setTimeout(() => playSound.achievement(), 500);
                                 
                                 // Recargar todos los logros
                                 loadUserAchievements();
@@ -1471,6 +1598,23 @@
                                         )}
                                     </button>
                                     
+                                    {/* 🎵 BOTÓN DE SONIDO */}
+                                    <button
+                                        onClick={toggleSound}
+                                        className={`p-2 rounded-md transition-colors ${
+                                            soundEnabled
+                                                ? isDarkMode 
+                                                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                                                    : 'bg-green-500 hover:bg-green-600 text-white'
+                                                : isDarkMode 
+                                                    ? 'bg-gray-600 hover:bg-gray-700 text-white' 
+                                                    : 'bg-gray-400 hover:bg-gray-500 text-white'
+                                        }`}
+                                        title={soundEnabled ? 'Silenciar sonidos' : 'Activar sonidos'}
+                                    >
+                                        {soundEnabled ? '🔊' : '🔇'}
+                                    </button>
+                                    
                                     <button
                                         onClick={() => setIsDarkMode(!isDarkMode)}
                                         className={`p-2 rounded-md transition-colors ${
@@ -1587,6 +1731,12 @@
                                         onClick={() => {
                                             console.log('=== CLICK EN BOTÓN BORRAR ===');
                                             console.log('canErase:', canErase);
+                                            
+                                            // 🎵 SONIDO ANTES DE VERIFICAR
+                                            if (canErase) {
+                                                playSound.click();
+                                            }
+                                            
                                             handleEraseClick();
                                         }}
                                         disabled={!canErase}
@@ -1675,6 +1825,77 @@
                                                 </span>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    {/* 🎵 CONTROLES DE SONIDO */}
+                                    <div className={`mt-4 p-3 rounded-lg ${
+                                        isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
+                                    }`}>
+                                        <h4 className="font-medium mb-2 flex items-center gap-2">
+                                            🎵 Sonido
+                                            <button
+                                                onClick={toggleSound}
+                                                className={`text-xs px-2 py-1 rounded ${
+                                                    soundEnabled
+                                                        ? isDarkMode ? 'bg-green-700 text-green-200' : 'bg-green-100 text-green-800'
+                                                        : isDarkMode ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'
+                                                }`}
+                                            >
+                                                {soundEnabled ? '🔊 ON' : '🔇 OFF'}
+                                            </button>
+                                        </h4>
+                                        
+                                        {soundEnabled && (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2 text-sm">
+                                                    <span>Volumen:</span>
+                                                    <input
+                                                        type="range"
+                                                        min="0"
+                                                        max="1"
+                                                        step="0.1"
+                                                        value={soundVolume}
+                                                        onChange={(e) => {
+                                                            const newVolume = parseFloat(e.target.value);
+                                                            setSoundVolume(newVolume);
+                                                            // Reproducir sonido de prueba
+                                                            setTimeout(() => playSound.click(), 100);
+                                                        }}
+                                                        className="flex-1 h-2"
+                                                    />
+                                                    <span className="font-mono text-xs w-8">
+                                                        {Math.round(soundVolume * 100)}%
+                                                    </span>
+                                                </div>
+                                                
+                                                <div className="flex gap-1 text-xs">
+                                                    <button
+                                                        onClick={() => playSound.place()}
+                                                        className={`px-2 py-1 rounded ${
+                                                            isDarkMode ? 'bg-blue-700 text-blue-200 hover:bg-blue-600' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                                                        }`}
+                                                    >
+                                                        🔢 Colocar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => playSound.hint()}
+                                                        className={`px-2 py-1 rounded ${
+                                                            isDarkMode ? 'bg-yellow-700 text-yellow-200 hover:bg-yellow-600' : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                                                        }`}
+                                                    >
+                                                        💡 Pista
+                                                    </button>
+                                                    <button
+                                                        onClick={() => playSound.success()}
+                                                        className={`px-2 py-1 rounded ${
+                                                            isDarkMode ? 'bg-green-700 text-green-200 hover:bg-green-600' : 'bg-green-100 text-green-800 hover:bg-green-200'
+                                                        }`}
+                                                    >
+                                                        🎉 Éxito
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Leyenda */}

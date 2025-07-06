@@ -1,208 +1,169 @@
-# 🎮 Sudoku
+# 🎮 Sudoku Minimalista
 
-Una aplicación de Sudoku profesional con características avanzadas y diseño minimalista.
+Aplicación de Sudoku profesional con características avanzadas y auto-guardado inteligente.
 
-![Sudoku Game](https://img.shields.io/badge/Status-Functional-brightgreen)
-![Version](https://img.shields.io/badge/Version-1.0-blue)
-![Tech](https://img.shields.io/badge/Tech-React%20%2B%20PHP-orange)
+![Version](https://img.shields.io/badge/version-1.1-blue) ![Status](https://img.shields.io/badge/status-Production%20Ready-green) ![Tech](https://img.shields.io/badge/tech-React%20%2B%20PHP%20%2B%20MySQL-orange)
 
 ## ✨ Características Principales
 
-### 🎨 **Highlighting Inteligente**
-- **Números iguales**: Resalta automáticamente todas las celdas con el mismo número
-- **Fila y columna**: Highlighting sutil de la fila y columna seleccionada
-- **Highlighting híbrido**: Doble resaltado para números iguales en misma fila/columna
+### 🎯 Funcionalidades Core
+- 🎨 **Highlighting Inteligente** - Resalta números, filas, columnas y conflictos
+- 🔄 **Puzzles Infinitos** - 5 dificultades con generación dinámica
+- 🤖 **Validación Visual** - Errores en tiempo real con números rojos
+- 💡 **Sistema de Pistas** - Explicaciones educativas inteligentes (máx. 3 por puzzle)
+- 💾 **Auto-guardado** - Progreso guardado automáticamente cada 10 segundos
+- 🔄 **Recuperación de Partidas** - Continúa exactamente donde lo dejaste
 
-### 🎯 **Sistema de Puzzles**
-- **5 dificultades**: Easy, Medium, Hard, Expert, Master
-- **Puzzles infinitos**: Base de datos con múltiples puzzles por dificultad
-- **APIs dinámicas**: Carga puzzles únicos desde el backend
-- **Game tracking**: Cada partida tiene ID único para estadísticas
+### 🎨 Experiencia de Usuario
+- 🌙 **Modo Oscuro/Claro** - Diseño adaptativo
+- 📱 **Responsive Design** - Perfecto en móvil y desktop
+- ⌨️ **Controles de Teclado** - Navegación completa con teclado
+- 📊 **Estadísticas en Tiempo Real** - Tiempo, movimientos, progreso
+- 🎮 **Interfaz Minimalista** - Diseño limpio y profesional
 
-### 🎮 **Experiencia de Usuario**
-- **Selección intuitiva**: Clic en cualquier celda para seleccionar
-- **Auto-selección**: Al hacer clic en una celda con número, se auto-selecciona ese número
-- **Borrado inteligente**: Solo permite borrar números que tú pusiste
-- **Feedback visual**: Highlighting inmediato y animaciones suaves
+### 🔧 Características Técnicas
+- 📡 **APIs REST** - Backend robusto con PHP y MySQL
+- 🗄️ **Base de Datos Optimizada** - Almacenamiento eficiente de puzzles y progreso
+- 🔐 **Gestión de Sesiones** - Sistema de usuarios anónimos
+- ⚡ **Performance Optimizado** - Carga rápida y experiencia fluida
 
-### 🌙 **Diseño y UI**
-- **Modo oscuro/claro**: Toggle suave entre temas
-- **Responsive design**: Funciona perfectamente en móvil y desktop
-- **Animaciones CSS**: Transiciones suaves y micro-interacciones
-- **Contador de números**: Muestra cuántos números quedan por dificultad
+## 🚀 Quick Start
 
-### 📊 **Sistema de Estadísticas**
-- **Timer de juego**: Cronómetro automático con pausa
-- **Contador de movimientos**: Tracking de todas las acciones
-- **Progreso visual**: Porcentaje de completado en tiempo real
-- **Session management**: Usuarios anónimos con tracking
+### Requisitos
+- XAMPP con Apache y MySQL
+- PHP 7.4+ 
+- Navegador moderno (Chrome, Firefox, Safari, Edge)
 
-## 🛠️ Tech Stack
-
-### **Frontend**
-- **React 18**: Biblioteca principal de UI
-- **Tailwind CSS**: Framework de estilos utilitarios
-- **Babel**: Transpilación de JSX en tiempo real
-- **Vanilla JS**: Sin dependencias adicionales
-
-### **Backend**
-- **PHP 8**: Lenguaje del servidor
-- **MySQL**: Base de datos relacional
-- **PDO**: Conexión segura a base de datos
-- **REST APIs**: Endpoints JSON para comunicación
-
-### **Arquitectura**
-- **SPA (Single Page Application)**: React con estado local
-- **API-driven**: Frontend consume APIs REST del backend
-- **Session-based**: Usuarios anónimos con PHP sessions
-- **Responsive**: Mobile-first design
-
-## 🚀 Instalación y Configuración
-
-### **Requisitos**
-- XAMPP (Apache + MySQL + PHP 8+)
-- Navegador moderno con soporte ES6+
-
-### **Setup**
+### Instalación
 1. **Clonar repositorio**
    ```bash
    git clone https://github.com/guslozua/Sudoku.git
    cd Sudoku
    ```
 
-2. **Configurar XAMPP**
-   - Colocar proyecto en `C:\xampp\htdocs\Sudoku`
-   - Iniciar Apache y MySQL
+2. **Configurar base de datos**
+   - Crear base de datos `sudoku` en MySQL
+   - Importar estructura de tablas (ver `/database/` para scripts)
 
-3. **Configurar Base de Datos**
-   - Crear base de datos `sudoku` en phpMyAdmin
-   - Importar el archivo SQL proporcionado
-   - O ejecutar: `http://localhost/Sudoku/test_api.php` para auto-setup
-
-4. **Acceder a la aplicación**
-   ```
-   http://localhost/Sudoku/public
-   ```
-
-## 📁 Estructura del Proyecto
-
-```
-Sudoku/
-├── 📁 app/Http/Controllers/     # Controladores PHP
-├── 📁 resources/views/sudoku/   # Vista principal React
-├── 📁 routes/                   # Definición de rutas
-├── 📁 public/                   # Punto de entrada web
-├── 📄 api_router.php           # Router de APIs REST
-├── 📄 test_api.php             # Script de testing y setup
-└── 📄 README.md                # Este archivo
-```
-
-## 🎯 APIs Disponibles
-
-### **Puzzles**
-- `GET /api/puzzle/new/{difficulty}` - Obtener nuevo puzzle
-- `POST /api/puzzle/validate` - Validar solución
-
-### **Juegos**
-- `POST /api/game/save` - Guardar progreso
-- `POST /api/game/complete` - Marcar como completado
-
-### **Estadísticas**
-- `GET /api/stats` - Obtener estadísticas del usuario
+3. **Iniciar servidor**
+   - Asegurarse de que XAMPP esté corriendo
+   - Acceder a `http://localhost/Sudoku/public`
 
 ## 🎮 Cómo Jugar
 
-1. **Seleccionar celda**: Haz clic en cualquier celda del tablero
-2. **Colocar número**: Haz clic en un número del panel lateral
-3. **Observar highlighting**: Automáticamente se resaltan números iguales y fila/columna
-4. **Borrar números**: Usa el botón borrar o tecla Backspace (solo en números que tú pusiste)
-5. **Cambiar dificultad**: Usa el selector en la parte superior
-6. **Nuevo puzzle**: Botón "Nuevo" para cargar un puzzle diferente
+### 🎯 Controles Básicos
+- **Click en celda** - Seleccionar celda
+- **Números 1-9** - Colocar número
+- **Backspace/Delete** - Borrar número
+- **Flechas** - Navegar entre celdas
+- **Tab** - Siguiente celda editable
 
-## 🎨 Características Visuales
+### 💡 Sistema de Pistas
+- Máximo 3 pistas por puzzle
+- Explicaciones educativas detalladas
+- Highlighting especial de la celda sugerida
+- Auto-oculto después de 5 segundos
 
-### **Sistema de Highlighting**
-- 🔵 **Celda seleccionada**: Anillo azul brillante + sombra
-- 🟦 **Números iguales**: Fondo azul medio con animación pulse
-- 🟦 **Fila/columna**: Highlighting sutil azul claro
-- 🔷 **Híbrido**: Azul intenso para números iguales EN fila/columna
+### 💾 Auto-guardado
+- Guardado automático cada 10 segundos
+- Modal de continuación al volver
+- Restauración completa del estado
+- Indicadores visuales de estado de guardado
 
-### **Estados de Celdas**
-- 🔲 **Originales**: Celdas del puzzle (no editables)
-- ✏️ **Editables**: Celdas donde puedes poner números
-- 🔴 **Errores**: Números que violan reglas de Sudoku
-- ✅ **Completadas**: Al finalizar el puzzle
+## 🔄 API Endpoints
 
-## 📊 Base de Datos
-
-### **Tablas Principales**
-- `puzzles`: Almacena puzzles y soluciones por dificultad
-- `games`: Tracking de partidas individuales
-- `users`: Usuarios anónimos con sessions
-- `stats`: Estadísticas y métricas de juego
-
-### **Datos Incluidos**
-- **21 puzzles únicos**: 3-6 puzzles por cada dificultad
-- **Auto-poblado**: Script automático si no hay datos
-- **Escalable**: Fácil agregar más puzzles
-
-## 🔧 Debugging y Testing
-
-### **Herramientas de Debug**
-- Panel de debug temporal (removible para producción)
-- Logs detallados en consola del navegador
-- Script de testing de APIs: `/test_api.php`
-- Botón de test de API integrado (🧪)
-
-### **Testing**
-```bash
-# Probar APIs directamente
-http://localhost/Sudoku/public/api/puzzle/new/easy
-
-# Script de testing completo
-http://localhost/Sudoku/test_api.php
+### **Puzzles:**
+```
+GET  /api/puzzle/new/{difficulty}    - Nuevo puzzle
 ```
 
-## 🌟 Roadmap Futuro
+### **Juego:**
+```
+POST /api/game/save                  - Guardar progreso
+GET  /api/game/current               - Juego actual
+```
 
-### **Versión 1.1**
-- [ ] 🤖 Validación de errores visual en tiempo real
-- [ ] 💡 Sistema de pistas inteligente (máximo 3 por puzzle)
-- [ ] 💾 Auto-guardado automático cada 10 segundos
-- [ ] 🏆 Sistema de logros y badges
+### **Pistas:**
+```
+POST /api/hint                       - Obtener pista
+```
 
-### **Versión 1.2**
-- [ ] 🎵 Sonidos sutiles para feedback
-- [ ] 📊 Gráficos de progreso detallados
-- [ ] 🌐 Multi-idioma (español/inglés)
-- [ ] 🎨 Temas personalizables
+## 🎨 Personalización
 
-### **Versión 1.3**
-- [ ] 👥 Modo multijugador cooperativo
-- [ ] 🏁 Desafíos diarios con rankings
-- [ ] 📱 PWA (Progressive Web App)
-- [ ] 🤖 IA para análisis de patrones
+### **Colores Principales:**
+```css
+/* Modo Claro */
+--primary-bg: #FFFFFF
+--secondary-bg: #F8F9FA  
+--accent-color: #0066CC
+--success-color: #28A745
+--error-color: #DC3545
 
-## 🤝 Contribuciones
+/* Modo Oscuro */
+--primary-bg: #1A1A1A
+--secondary-bg: #2D2D2D
+--accent-color: #4A9EFF
+```
 
-¡Las contribuciones son bienvenidas! Si tienes ideas para mejorar el juego:
+### **Tipografía:**
+- **Fuente**: Inter (Google Fonts)
+- **Tamaños**: 16px base, 24px números, 14px notas
+- **Pesos**: 400 regular, 600 semi-bold, 700 bold
 
-1. Fork el repositorio
-2. Crea una branch para tu feature (`git checkout -b feature/AmazingFeature`)
+## 📊 Sistema de Estadísticas
+
+### **Datos Guardados Automáticamente:**
+- ⏱️ **Tiempo de juego**
+- 🎯 **Número de movimientos**
+- 💡 **Pistas utilizadas**
+- 📈 **Progreso del puzzle**
+- 🏆 **Partidas completadas**
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React 18 + Tailwind CSS
+- **Backend**: PHP 8 + MySQL
+- **Session Management**: PHP Sessions
+- **API**: REST endpoints
+- **Database**: 21+ puzzles únicos pre-cargados
+
+## 🏆 Roadmap
+
+### **Versión 1.2 (Próxima):**
+- 🏆 Sistema de logros y badges
+- 🎵 Sonidos sutiles para feedback
+- 📊 Gráficos de progreso detallados
+- 🌐 Multi-idioma (español/inglés)
+
+### **Versión 1.3 (Futura):**
+- 👥 Modo multijugador cooperativo
+- 🏁 Desafíos diarios con rankings
+- 📱 PWA (Progressive Web App)
+- 🔄 Sincronización en la nube
+
+## 🤝 Contribuir
+
+¡Las contribuciones son bienvenidas! Por favor:
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
 3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la branch (`git push origin feature/AmazingFeature`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
 5. Abre un Pull Request
 
 ## 📝 Licencia
 
-Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
+Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para detalles.
 
-## 👤 Autor
+## 🙏 Agradecimientos
 
-**guslozua** - [GitHub](https://github.com/guslozua)
+- React team por el excelente framework
+- Tailwind CSS por el sistema de diseño
+- Google Fonts por la tipografía Inter
+- Comunidad de desarrolladores por la inspiración
 
 ---
 
-⭐ ¡Si te gusta este proyecto, dale una estrella en GitHub!
+**Desarrollado con ❤️ para la comunidad de Sudoku**
 
-🎮 **¡Disfruta jugando Sudoku!**
+¿Encontraste un bug? ¿Tienes una sugerencia? [Abre un issue](https://github.com/guslozua/Sudoku/issues)

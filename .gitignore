@@ -38,3 +38,11 @@ public/storage
 # Backup files
 *.bak
 *.backup
+
+# Archivos temporales de debug
+temp_*
+test_*.php
+debug_*.php
+fix_*.php
+complete_fix_*.php
+cleanup.sh

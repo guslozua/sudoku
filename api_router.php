@@ -82,6 +82,22 @@ class SudokuController
     }
     
     /**
+     * Obtener o crear usuario de sesión anónimo (método público)
+     */
+    public function getOrCreateSessionUserPublic()
+    {
+        return $this->getOrCreateSessionUser();
+    }
+    
+    /**
+     * Obtener conexión PDO (método público)
+     */
+    public function getPdo()
+    {
+        return $this->pdo;
+    }
+    
+    /**
      * Obtener o crear usuario de sesión anónimo
      */
     private function getOrCreateSessionUser()
@@ -309,13 +325,83 @@ try {
             exit;
         }
         
-        // GET /puzzle/{id}
-        if (preg_match('#^/puzzle/(\d+)$#', $requestUri, $matches)) {
-            $puzzleId = $matches[1];
-            // Implementar si es necesario
-            header('Content-Type: application/json');
-            echo json_encode(['error' => 'Endpoint no implementado aún']);
-            exit;
+        // GET /game/current
+        if ($requestUri === '/game/current') {
+            error_log("💾 Ruta de juego actual detectada: /game/current");
+            
+            try {
+                // Obtener ID de usuario de sesión directamente
+                $sessionId = $_SESSION['sudoku_session_id'] ?? null;
+                if (!$sessionId) {
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'No hay sesión activa'
+                    ]);
+                    exit;
+                }
+                
+                // Buscar usuario por session_id
+                $stmt = $controller->getPdo()->prepare("SELECT id FROM users WHERE session_id = ?");
+                $stmt->execute([$sessionId]);
+                $user = $stmt->fetch();
+                
+                if (!$user) {
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'Usuario no encontrado'
+                    ]);
+                    exit;
+                }
+                
+                $userId = $user['id'];
+                
+                // Buscar el juego más reciente en progreso
+                $stmt = $controller->getPdo()->prepare("
+                    SELECT g.*, p.puzzle_string, p.solution_string, p.difficulty_level, p.clues_count 
+                    FROM games g 
+                    LEFT JOIN puzzles p ON g.puzzle_id = p.id 
+                    WHERE g.user_id = ? AND g.status = 'in_progress' 
+                    ORDER BY g.last_played_at DESC 
+                    LIMIT 1
+                ");
+                $stmt->execute([$userId]);
+                $game = $stmt->fetch();
+                
+                if ($game) {
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'success' => true,
+                        'game' => [
+                            'id' => $game['id'],
+                            'current_state' => $game['current_state'],
+                            'initial_state' => $game['initial_state'],
+                            'status' => $game['status'],
+                            'time_spent' => $game['time_spent'],
+                            'moves_count' => $game['moves_count'],
+                            'hints_used' => $game['hints_used'],
+                            'last_played_at' => $game['last_played_at'],
+                            'puzzle' => [
+                                'difficulty_level' => $game['difficulty_level'],
+                                'clues_count' => $game['clues_count']
+                            ]
+                        ]
+                    ]);
+                } else {
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'No hay juegos en progreso'
+                    ]);
+                }
+                exit;
+            } catch (Exception $e) {
+                error_log("❌ Error obteniendo juego actual: " . $e->getMessage());
+                header('Content-Type: application/json');
+                echo json_encode(['error' => 'Error al obtener juego actual: ' . $e->getMessage(), 'success' => false]);
+                exit;
+            }
         }
     }
     
@@ -336,7 +422,7 @@ try {
             }
             
             // Generar pista inteligente
-            $hint = $this->generateIntelligentHint($currentState);
+            $hint = $controller->generateIntelligentHint($currentState);
             
             if (!$hint) {
                 header('Content-Type: application/json');
@@ -353,20 +439,104 @@ try {
             exit;
         }
         
-        // POST /puzzle/validate
-        if ($requestUri === '/puzzle/validate') {
-            // Implementar si es necesario
-            header('Content-Type: application/json');
-            echo json_encode(['error' => 'Endpoint no implementado aún']);
-            exit;
-        }
-        
         // POST /game/save
         if ($requestUri === '/game/save') {
-            // Implementar si es necesario
-            header('Content-Type: application/json');
-            echo json_encode(['error' => 'Endpoint no implementado aún']);
-            exit;
+            error_log("💾 Ruta de guardado detectada: /game/save");
+            
+            // Leer datos del POST
+            $input = json_decode(file_get_contents('php://input'), true);
+            $gameId = $input['game_id'] ?? null;
+            $currentState = $input['current_state'] ?? null;
+            $timeSpent = $input['time_spent'] ?? 0;
+            $movesCount = $input['moves_count'] ?? 0;
+            $hintsUsed = $input['hints_used'] ?? 0;
+            
+            if (!$gameId || !$currentState) {
+                header('Content-Type: application/json');
+                echo json_encode(['error' => 'Faltan parámetros requeridos', 'success' => false]);
+                exit;
+            }
+            
+            try {
+                // Verificar que el juego existe y pertenece al usuario actual
+                $sessionId = $_SESSION['sudoku_session_id'] ?? null;
+                error_log("💾 [SAVE] Session ID: " . ($sessionId ?: 'NULL'));
+                
+                if (!$sessionId) {
+                    error_log("💾 [SAVE] ERROR: No hay sesión activa");
+                    header('Content-Type: application/json');
+                    echo json_encode(['error' => 'No hay sesión activa', 'success' => false]);
+                    exit;
+                }
+                
+                // Buscar usuario
+                $stmt = $controller->getPdo()->prepare("SELECT id FROM users WHERE session_id = ?");
+                $stmt->execute([$sessionId]);
+                $user = $stmt->fetch();
+                
+                error_log("💾 [SAVE] Usuario encontrado: " . ($user ? "ID {$user['id']}" : 'NO ENCONTRADO'));
+                
+                if (!$user) {
+                    error_log("💾 [SAVE] ERROR: Usuario no encontrado para session: $sessionId");
+                    header('Content-Type: application/json');
+                    echo json_encode(['error' => 'Usuario no encontrado', 'success' => false]);
+                    exit;
+                }
+                
+                // Verificar que el juego pertenece al usuario
+                $stmt = $controller->getPdo()->prepare("SELECT id, user_id FROM games WHERE id = ?");
+                $stmt->execute([$gameId]);
+                $gameExists = $stmt->fetch();
+                
+                error_log("💾 [SAVE] Juego verificado - Game ID: $gameId");
+                if ($gameExists) {
+                    error_log("💾 [SAVE] Juego encontrado - Pertenece a User ID: {$gameExists['user_id']}, Usuario actual: {$user['id']}");
+                } else {
+                    error_log("💾 [SAVE] ERROR: Juego $gameId no existe");
+                }
+                
+                if (!$gameExists) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['error' => 'Juego no encontrado', 'success' => false]);
+                    exit;
+                }
+                
+                if ($gameExists['user_id'] != $user['id']) {
+                    error_log("💾 [SAVE] ERROR: Juego pertenece a otro usuario");
+                    header('Content-Type: application/json');
+                    echo json_encode(['error' => 'Sin permisos para este juego', 'success' => false]);
+                    exit;
+                }
+                
+                error_log("💾 [SAVE] Ejecutando UPDATE...");
+                
+                // Actualizar el juego en la base de datos
+                $stmt = $controller->getPdo()->prepare("UPDATE games SET current_state = ?, time_spent = ?, moves_count = ?, hints_used = ?, last_played_at = NOW() WHERE id = ?");
+                $result = $stmt->execute([$currentState, $timeSpent, $movesCount, $hintsUsed, $gameId]);
+                
+                error_log("💾 [SAVE] Resultado UPDATE: " . ($result ? 'EXITOSO' : 'FALLIDO'));
+                error_log("💾 [SAVE] Filas afectadas: " . $stmt->rowCount());
+                
+                if ($result && $stmt->rowCount() > 0) {
+                    error_log("💾 [SAVE] ✅ Guardado exitoso");
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'Juego guardado exitosamente',
+                        'saved_at' => date('Y-m-d H:i:s')
+                    ]);
+                } else {
+                    error_log("💾 [SAVE] ❌ Error: No se afectaron filas");
+                    header('Content-Type: application/json');
+                    echo json_encode(['error' => 'No se pudo actualizar el juego', 'success' => false]);
+                }
+                exit;
+            } catch (Exception $e) {
+                error_log("❌ Error guardando juego: " . $e->getMessage());
+                header('Content-Type: application/json');
+                echo json_encode(['error' => 'Error al guardar el juego', 'success' => false]);
+                exit;
+            }
         }
     }
     

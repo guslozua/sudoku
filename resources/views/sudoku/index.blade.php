@@ -81,6 +81,13 @@
             const [hintsRemaining, setHintsRemaining] = useState(3);
             const [lastHint, setLastHint] = useState(null);
             const [showingHint, setShowingHint] = useState(false);
+            
+            // 💾 ESTADO PARA AUTO-GUARDADO
+            const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved', 'error'
+            const [lastSaved, setLastSaved] = useState(null);
+            const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+            const [showContinueDialog, setShowContinueDialog] = useState(false);
+            const [savedGameData, setSavedGameData] = useState(null);
 
             const API_BASE = '/Sudoku/public/api';
             const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -95,7 +102,9 @@
                 // ✅ Test inicial de conectividad
                 console.log('🚀 Iniciando Sudoku App...');
                 console.log('API_BASE configurado:', API_BASE);
-                loadNewPuzzle('easy');
+                
+                // 💾 Verificar si hay una partida guardada
+                checkForSavedGame();
             }, []);
 
             // Timer mejorado - se detiene cuando se completa
@@ -519,6 +528,202 @@
                 const secs = seconds % 60;
                 return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
             };
+            
+            const formatTimeSince = (date) => {
+                const seconds = Math.floor((new Date() - date) / 1000);
+                if (seconds < 60) return 'hace pocos segundos';
+                const minutes = Math.floor(seconds / 60);
+                if (minutes < 60) return `hace ${minutes} min`;
+                const hours = Math.floor(minutes / 60);
+                return `hace ${hours}h`;
+            };
+            
+            // 💾 SISTEMA DE AUTO-GUARDADO
+            
+            // Verificar si hay una partida guardada al iniciar
+            const checkForSavedGame = async () => {
+                console.log('💾 Verificando partidas guardadas...');
+                try {
+                    const response = await fetch(`${API_BASE}/game/current`, {
+                        method: 'GET',
+                        headers: getHeaders(),
+                        credentials: 'same-origin' // Importante para mantener sesión
+                    });
+                    
+                    console.log('💾 Respuesta de verificación (status):', response.status);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('💾 Datos de verificación:', data);
+                        
+                        if (data.success && data.game && data.game.status === 'in_progress') {
+                            console.log('💾 Partida guardada encontrada:', data.game);
+                            setSavedGameData(data.game);
+                            setLoading(false); // ✅ IMPORTANTE: Quitar loading antes del modal
+                            setShowContinueDialog(true);
+                            return;
+                        } else {
+                            console.log('💾 No hay partidas en progreso:', data.message);
+                        }
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        console.log('💾 Error del servidor al verificar:', errorData);
+                    }
+                } catch (error) {
+                    console.log('💾 Error al verificar partidas guardadas:', error.message);
+                }
+                
+                // Si no hay partida guardada, cargar nueva
+                console.log('💾 Cargando nuevo puzzle por defecto...');
+                loadNewPuzzle('easy');
+            };
+            
+            // Cargar partida guardada
+            const loadSavedGame = () => {
+                if (!savedGameData) {
+                    console.log('❌ No hay datos de partida guardada');
+                    return;
+                }
+                
+                console.log('💾 Cargando partida guardada...');
+                console.log('💾 Datos a cargar:', savedGameData);
+                
+                try {
+                    const savedBoard = stringToBoard(savedGameData.current_state);
+                    const originalBoard = stringToBoard(savedGameData.initial_state);
+                    
+                    console.log('💾 Board guardado:', savedBoard);
+                    console.log('💾 Board original:', originalBoard);
+                    
+                    setBoard(deepCopyBoard(savedBoard));
+                    setInitialBoard(deepCopyBoard(originalBoard));
+                    setGameId(savedGameData.id);
+                    setTimer(savedGameData.time_spent || 0);
+                    setIsPlaying(true);
+                    setGameStats({
+                        hintsUsed: savedGameData.hints_used || 0,
+                        movesCount: savedGameData.moves_count || 0
+                    });
+                    setHintsRemaining(3 - (savedGameData.hints_used || 0));
+                    setPuzzleCompleted(false);
+                    setLoading(false); // ✅ IMPORTANTE: Quitar loading
+                    setShowContinueDialog(false); // ✅ IMPORTANTE: Cerrar modal
+                    setHasUnsavedChanges(false);
+                    setLastSaved(new Date());
+                    
+                    console.log('✅ Partida guardada cargada exitosamente');
+                    console.log('  - Game ID:', savedGameData.id);
+                    console.log('  - Tiempo:', savedGameData.time_spent || 0);
+                    console.log('  - Movimientos:', savedGameData.moves_count || 0);
+                    console.log('  - Pistas usadas:', savedGameData.hints_used || 0);
+                } catch (error) {
+                    console.error('❌ Error cargando partida guardada:', error);
+                    // Si hay error, cargar nuevo puzzle
+                    startNewGame();
+                }
+            };
+            
+            // Empezar nueva partida (descartar guardado)
+            const startNewGame = () => {
+                console.log('🆕 Iniciando nueva partida...');
+                setShowContinueDialog(false);
+                setSavedGameData(null);
+                setLoading(true); // ✅ IMPORTANTE: Activar loading
+                loadNewPuzzle('easy');
+            };
+            
+            // Auto-guardar el progreso actual
+            const autoSaveGame = async () => {
+                if (!gameId || puzzleCompleted || !hasUnsavedChanges) {
+                    return;
+                }
+                
+                setAutoSaveStatus('saving');
+                console.log('💾 Auto-guardando progreso...');
+                console.log('  - Game ID:', gameId);
+                console.log('  - Board state:', board.flat().join(''));
+                
+                try {
+                    const currentBoardString = board.flat().join('');
+                    
+                    console.log('💾 Enviando datos de guardado:', {
+                        game_id: gameId,
+                        current_state: currentBoardString,
+                        time_spent: timer,
+                        moves_count: gameStats.movesCount,
+                        hints_used: gameStats.hintsUsed
+                    });
+                    
+                    const response = await fetch(`${API_BASE}/game/save`, {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        credentials: 'same-origin', // Importante para mantener sesión
+                        body: JSON.stringify({
+                            game_id: gameId,
+                            current_state: currentBoardString,
+                            time_spent: timer,
+                            moves_count: gameStats.movesCount,
+                            hints_used: gameStats.hintsUsed
+                        })
+                    });
+                    
+                    console.log('💾 Respuesta del servidor (status):', response.status);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('💾 Respuesta completa:', data);
+                        
+                        if (data.success) {
+                            setAutoSaveStatus('saved');
+                            setLastSaved(new Date());
+                            setHasUnsavedChanges(false);
+                            console.log('✅ Auto-guardado exitoso');
+                            
+                            // Volver a 'idle' después de 2 segundos
+                            setTimeout(() => {
+                                setAutoSaveStatus('idle');
+                            }, 2000);
+                        } else {
+                            throw new Error(data.error || 'Error desconocido');
+                        }
+                    } else {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.error || `Error del servidor: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('❌ Error en auto-guardado:', error.message);
+                    console.error('❌ Detalles del error:', error);
+                    setAutoSaveStatus('error');
+                    
+                    // Volver a 'idle' después de 3 segundos
+                    setTimeout(() => {
+                        setAutoSaveStatus('idle');
+                    }, 3000);
+                }
+            };
+            
+            // Marcar cambios cuando se modifica el board
+            useEffect(() => {
+                if (gameId && !puzzleCompleted) {
+                    setHasUnsavedChanges(true);
+                }
+            }, [board, timer, gameStats]);
+            
+            // Auto-guardar cada 10 segundos si hay cambios
+            useEffect(() => {
+                if (hasUnsavedChanges && !puzzleCompleted) {
+                    const autoSaveInterval = setInterval(() => {
+                        autoSaveGame();
+                    }, 10000); // 10 segundos
+                    
+                    return () => clearInterval(autoSaveInterval);
+                }
+            }, [hasUnsavedChanges, puzzleCompleted, gameId]);
+            
+            // Guardar manualmente
+            const saveGameManually = () => {
+                autoSaveGame();
+            };
 
             // 💡 SISTEMA DE PISTAS INTELIGENTE
             const getHint = async () => {
@@ -758,6 +963,72 @@
                 <div className={`min-h-screen transition-colors duration-300 ${
                     isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'
                 }`}>
+                    {/* 💾 MODAL DE CONTINUAR PARTIDA */}
+                    {showContinueDialog && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className={`p-6 rounded-lg shadow-xl max-w-md w-full mx-4 ${
+                                isDarkMode ? 'bg-gray-800 border border-gray-600' : 'bg-white border border-gray-200'
+                            }`}>
+                                <h3 className="text-lg font-bold mb-4">💾 ¿Continuar partida anterior?</h3>
+                                
+                                {savedGameData && (
+                                    <div className={`mb-4 p-3 rounded-lg ${
+                                        isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
+                                    }`}>
+                                        <div className="space-y-1 text-sm">
+                                            <div className="flex justify-between">
+                                                <span>Dificultad:</span>
+                                                <span className="font-medium">
+                                                    {savedGameData.puzzle?.difficulty_level || 'N/A'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Progreso:</span>
+                                                <span className="font-medium">
+                                                    {savedGameData.current_state ? 
+                                                        Math.round(((81 - savedGameData.current_state.split('0').length + 1) / 81) * 100)
+                                                        : 0}%
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Tiempo:</span>
+                                                <span className="font-medium">
+                                                    {formatTime(savedGameData.time_spent || 0)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Movimientos:</span>
+                                                <span className="font-medium">{savedGameData.moves_count || 0}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={loadSavedGame}
+                                        className={`flex-1 py-2 px-4 rounded-lg font-medium ${
+                                            isDarkMode 
+                                                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                                                : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                        }`}
+                                    >
+                                        💾 Continuar
+                                    </button>
+                                    <button
+                                        onClick={startNewGame}
+                                        className={`flex-1 py-2 px-4 rounded-lg font-medium ${
+                                            isDarkMode 
+                                                ? 'bg-gray-600 hover:bg-gray-700 text-white border border-gray-500' 
+                                                : 'bg-gray-200 hover:bg-gray-300 text-gray-800 border border-gray-300'
+                                        }`}
+                                    >
+                                        🆕 Nueva
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {/* Header */}
                     <div className={`border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                         <div className="max-w-6xl mx-auto px-4 py-4">
@@ -773,6 +1044,27 @@
                                         <span className={`font-mono ${puzzleCompleted ? 'text-green-500 font-bold' : ''}`}>
                                             ⏱️ {formatTime(timer)} {puzzleCompleted ? '✅' : ''}
                                         </span>
+                                        
+                                        {/* 💾 INDICADOR DE AUTO-GUARDADO */}
+                                        {autoSaveStatus !== 'idle' && (
+                                            <span className={`text-xs px-2 py-1 rounded-md font-medium ${
+                                                autoSaveStatus === 'saving' 
+                                                    ? isDarkMode ? 'bg-yellow-800 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
+                                                    : autoSaveStatus === 'saved'
+                                                        ? isDarkMode ? 'bg-green-800 text-green-200' : 'bg-green-100 text-green-800'
+                                                        : isDarkMode ? 'bg-red-800 text-red-200' : 'bg-red-100 text-red-800'
+                                            }`}>
+                                                {autoSaveStatus === 'saving' && '💾 Guardando...'}
+                                                {autoSaveStatus === 'saved' && '✅ Guardado'}
+                                                {autoSaveStatus === 'error' && '❌ Error'}
+                                            </span>
+                                        )}
+                                        
+                                        {lastSaved && autoSaveStatus === 'idle' && (
+                                            <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                💾 {formatTimeSince(lastSaved)}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                                 
@@ -975,6 +1267,28 @@
                                         `}
                                     >
                                         💡 Pista ({hintsRemaining}/3)
+                                    </button>
+                                    
+                                    {/* 💾 BOTÓN DE GUARDADO MANUAL */}
+                                    <button
+                                        onClick={saveGameManually}
+                                        disabled={!gameId || puzzleCompleted || autoSaveStatus === 'saving'}
+                                        className={`
+                                            w-full h-10 rounded-lg font-semibold text-sm number-button mt-2
+                                            ${!gameId || puzzleCompleted || autoSaveStatus === 'saving'
+                                                ? isDarkMode 
+                                                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
+                                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                : isDarkMode 
+                                                    ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                                                    : 'bg-purple-500 text-white hover:bg-purple-600'
+                                            }
+                                        `}
+                                    >
+                                        {autoSaveStatus === 'saving' ? '💾 Guardando...' : 
+                                         autoSaveStatus === 'saved' ? '✅ Guardado' :
+                                         autoSaveStatus === 'error' ? '❌ Reintentar' :
+                                         '💾 Guardar ahora'}
                                     </button>
 
                                     {/* Estadísticas */}

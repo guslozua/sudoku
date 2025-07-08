@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba de Logros - Sudoku</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background: #f0f0f0;
+        }
+        .achievement {
+            background: #e8f5e8;
+            border: 1px solid #4CAF50;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .achievement-icon {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+        .debug {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏆 Prueba de Sistema de Logros</h1>
+        
+        <div class="test-section">
+            <h2>1. Obtener Nuevo Puzzle</h2>
+            <button onclick="getNewPuzzle()">Obtener Puzzle Fácil</button>
+            <div id="puzzle-result" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>2. Simular Completar Puzzle</h2>
+            <button onclick="completePuzzle()">Completar Puzzle (Primer Paso)</button>
+            <button onclick="completePuzzleFast()">Completar Rápido (< 5 min)</button>
+            <button onclick="completePuzzlePerfect()">Completar Perfecto (sin errores)</button>
+            <div id="complete-result" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>3. Ver Logros</h2>
+            <button onclick="getAchievements()">Ver Todos los Logros</button>
+            <div id="achievements-result" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>4. Debug</h2>
+            <button onclick="clearSession()">Limpiar Sesión</button>
+            <div id="debug-info" class="debug"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentGameId = null;
+        let currentPuzzle = null;
+        
+        function log(message) {
+            console.log(message);
+            const debugDiv = document.getElementById('debug-info');
+            debugDiv.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '<br>';
+        }
+        
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                log(`Llamando API: ${method} ${endpoint}`);
+                const response = await fetch(`/Sudoku/public/api/${endpoint}`, options);
+                const result = await response.json();
+                
+                log(`Respuesta de API: ${JSON.stringify(result)}`);
+                return result;
+                
+            } catch (error) {
+                log(`Error en API: ${error.message}`);
+                return { error: error.message };
+            }
+        }
+        
+        async function getNewPuzzle() {
+            const result = await apiCall('puzzle/new/easy');
+            const resultDiv = document.getElementById('puzzle-result');
+            
+            if (result.success) {
+                currentGameId = result.game_id;
+                currentPuzzle = result.puzzle;
+                resultDiv.innerHTML = `
+                    <h4>✅ Puzzle Obtenido</h4>
+                    <p><strong>Game ID:</strong> ${result.game_id}</p>
+                    <p><strong>Dificultad:</strong> ${result.puzzle.difficulty_level}</p>
+                    <p><strong>Pistas:</strong> ${result.puzzle.clues_count}</p>
+                `;
+            } else {
+                resultDiv.innerHTML = `<h4>❌ Error</h4><p>${result.error}</p>`;
+            }
+        }
+        
+        async function completePuzzle() {
+            if (!currentGameId) {
+                alert('Primero obtén un puzzle');
+                return;
+            }
+            
+            const result = await apiCall('game/complete', 'POST', {
+                game_id: currentGameId,
+                current_state: currentPuzzle.solution_string,
+                time_spent: 600, // 10 minutos
+                moves_count: 150,
+                hints_used: 0,
+                mistakes_count: 2
+            });
+            
+            showCompletionResult(result);
+        }
+        
+        async function completePuzzleFast() {
+            if (!currentGameId) {
+                alert('Primero obtén un puzzle');
+                return;
+            }
+            
+            const result = await apiCall('game/complete', 'POST', {
+                game_id: currentGameId,
+                current_state: currentPuzzle.solution_string,
+                time_spent: 240, // 4 minutos (< 5 min para logro)
+                moves_count: 80,
+                hints_used: 0,
+                mistakes_count: 1
+            });
+            
+            showCompletionResult(result);
+        }
+        
+        async function completePuzzlePerfect() {
+            if (!currentGameId) {
+                alert('Primero obtén un puzzle');
+                return;
+            }
+            
+            const result = await apiCall('game/complete', 'POST', {
+                game_id: currentGameId,
+                current_state: currentPuzzle.solution_string,
+                time_spent: 480, // 8 minutos
+                moves_count: 90,
+                hints_used: 0,
+                mistakes_count: 0 // Sin errores para logro perfecto
+            });
+            
+            showCompletionResult(result);
+        }
+        
+        function showCompletionResult(result) {
+            const resultDiv = document.getElementById('complete-result');
+            
+            if (result.success) {
+                let html = '<h4>✅ Puzzle Completado</h4>';
+                
+                if (result.new_achievements && result.new_achievements.length > 0) {
+                    html += '<h5>🏆 ¡Nuevos Logros Desbloqueados!</h5>';
+                    result.new_achievements.forEach(achievement => {
+                        html += `
+                            <div class="achievement">
+                                <span class="achievement-icon">${achievement.icon}</span>
+                                <strong>${achievement.name}</strong><br>
+                                <small>${achievement.description}</small>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += '<p>No se desbloquearon nuevos logros</p>';
+                }
+                
+                resultDiv.innerHTML = html;
+                
+                // Limpiar para el siguiente test
+                currentGameId = null;
+                currentPuzzle = null;
+                
+            } else {
+                resultDiv.innerHTML = `<h4>❌ Error</h4><p>${result.error}</p>`;
+            }
+        }
+        
+        async function getAchievements() {
+            const result = await apiCall('achievements');
+            const resultDiv = document.getElementById('achievements-result');
+            
+            if (result.success) {
+                let html = '<h4>📊 Estado de Logros</h4>';
+                
+                result.achievements.forEach(achievement => {
+                    const status = achievement.is_completed ? '✅' : '⏳';
+                    const bgColor = achievement.is_completed ? '#e8f5e8' : '#f8f9fa';
+                    
+                    html += `
+                        <div style="background: ${bgColor}; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #ddd;">
+                            ${status} <span style="font-size: 20px;">${achievement.icon}</span>
+                            <strong>${achievement.name}</strong><br>
+                            <small>${achievement.description}</small><br>
+                            <small style="color: #666;">Categoría: ${achievement.category}</small>
+                        </div>
+                    `;
+                });
+                
+                resultDiv.innerHTML = html;
+            } else {
+                resultDiv.innerHTML = `<h4>❌ Error</h4><p>${result.error}</p>`;
+            }
+        }
+        
+        function clearSession() {
+            // Limpiar localStorage si existe
+            localStorage.clear();
+            
+            // Hacer una llamada para crear nueva sesión
+            fetch('/Sudoku/public/api/achievements')
+                .then(() => {
+                    log('Sesión reiniciada');
+                    document.getElementById('puzzle-result').innerHTML = '';
+                    document.getElementById('complete-result').innerHTML = '';
+                    document.getElementById('achievements-result').innerHTML = '';
+                });
+        }
+        
+        // Inicializar
+        log('Sistema de pruebas cargado');
+        log('Usa los botones para probar el sistema de logros');
+    </script>
+</body>
+</html>

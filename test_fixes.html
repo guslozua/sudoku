@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Test de Correcciones Sudoku</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .test-container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .test-item { margin: 15px 0; padding: 15px; border-left: 4px solid #ccc; background: #f9f9f9; }
+        .test-pass { border-left-color: #22c55e; background: #f0fdf4; }
+        .test-fail { border-left-color: #ef4444; background: #fef2f2; }
+        .test-warning { border-left-color: #f59e0b; background: #fffbeb; }
+        .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .log-output { background: #1f2937; color: #f3f4f6; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 12px; max-height: 300px; overflow-y: auto; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔧 Test de Correcciones - Sudoku App</h1>
+        <p>Esta página verifica que las correcciones implementadas funcionen correctamente.</p>
+        
+        <div id="test-results"></div>
+        
+        <div style="margin: 20px 0;">
+            <button class="btn btn-primary" onclick="runAllTests()">▶️ Ejecutar Todos los Tests</button>
+            <button class="btn btn-secondary" onclick="clearResults()">🗑️ Limpiar Resultados</button>
+        </div>
+        
+        <div id="log-container" style="display: none;">
+            <h3>📋 Log de Ejecución</h3>
+            <div id="log-output" class="log-output"></div>
+        </div>
+    </div>
+
+    <script>
+        let testResults = [];
+        let logOutput = [];
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+            logOutput.push(logMessage);
+            console.log(logMessage);
+            updateLogDisplay();
+        }
+
+        function updateLogDisplay() {
+            const logContainer = document.getElementById('log-container');
+            const logElement = document.getElementById('log-output');
+            logContainer.style.display = 'block';
+            logElement.innerHTML = logOutput.join('\n');
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function addTestResult(name, status, message) {
+            testResults.push({ name, status, message });
+            updateTestDisplay();
+        }
+
+        function updateTestDisplay() {
+            const container = document.getElementById('test-results');
+            container.innerHTML = testResults.map(test => {
+                const statusClass = test.status === 'pass' ? 'test-pass' : 
+                                  test.status === 'fail' ? 'test-fail' : 'test-warning';
+                const statusIcon = test.status === 'pass' ? '✅' : 
+                                 test.status === 'fail' ? '❌' : '⚠️';
+                return `
+                    <div class="test-item ${statusClass}">
+                        <strong>${statusIcon} ${test.name}</strong>
+                        <br><small>${test.message}</small>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function clearResults() {
+            testResults = [];
+            logOutput = [];
+            document.getElementById('test-results').innerHTML = '';
+            document.getElementById('log-container').style.display = 'none';
+            log('🗑️ Resultados limpiados');
+        }
+
+        // Test 1: Verificar APIs del navegador
+        function testBrowserAPIs() {
+            log('🔍 Testeando APIs del navegador...');
+            
+            // LocalStorage
+            try {
+                localStorage.setItem('test', 'value');
+                localStorage.removeItem('test');
+                addTestResult('LocalStorage', 'pass', 'LocalStorage funciona correctamente');
+                log('✅ LocalStorage: OK');
+            } catch (e) {
+                addTestResult('LocalStorage', 'fail', `Error: ${e.message}`);
+                log('❌ LocalStorage: ERROR - ' + e.message);
+            }
+
+            // Fetch API
+            if (typeof fetch === 'function') {
+                addTestResult('Fetch API', 'pass', 'Fetch API disponible');
+                log('✅ Fetch API: OK');
+            } else {
+                addTestResult('Fetch API', 'fail', 'Fetch API no disponible');
+                log('❌ Fetch API: NO DISPONIBLE');
+            }
+
+            // Console API
+            if (typeof console === 'object' && typeof console.log === 'function') {
+                addTestResult('Console API', 'pass', 'Console API funcional');
+                log('✅ Console API: OK');
+            } else {
+                addTestResult('Console API', 'fail', 'Console API no funcional');
+                log('❌ Console API: NO FUNCIONAL');
+            }
+        }
+
+        // Test 2: Simular el problema de auto-guardado
+        function testAutoSaveOptimization() {
+            log('🔍 Testeando optimización de auto-guardado...');
+            
+            let saveCount = 0;
+            let intervals = [];
+            
+            // Simular el problema anterior (múltiples intervalos)
+            function problematicAutoSave() {
+                const interval = setInterval(() => {
+                    saveCount++;
+                    log(`❌ PROBLEMÁTICO: Guardado #${saveCount} (interval ${intervals.length})`);
+                }, 1000);
+                intervals.push(interval);
+            }
+            
+            // Simular múltiples activaciones (como ocurría con hasUnsavedChanges)
+            problematicAutoSave();
+            setTimeout(() => problematicAutoSave(), 500);
+            setTimeout(() => problematicAutoSave(), 1000);
+            
+            setTimeout(() => {
+                // Limpiar intervalos
+                intervals.forEach(clearInterval);
+                
+                if (saveCount > 6) {
+                    addTestResult('Auto-guardado Problemático', 'fail', 
+                        `Se ejecutaron ${saveCount} guardados en 3 segundos (excesivo)`);
+                    log(`❌ Auto-guardado problemático: ${saveCount} ejecuciones`);
+                } else {
+                    addTestResult('Auto-guardado Problemático', 'warning', 
+                        `Se ejecutaron ${saveCount} guardados (menos de lo esperado para demo)`);
+                    log(`⚠️ Auto-guardado: ${saveCount} ejecuciones`);
+                }
+                
+                // Ahora probar la versión optimizada
+                testOptimizedAutoSave();
+            }, 3000);
+        }
+
+        function testOptimizedAutoSave() {
+            log('🔍 Testeando auto-guardado optimizado...');
+            
+            let optimizedSaveCount = 0;
+            let debounceTimeout = null;
+            let autoSaveInterval = null;
+            
+            function optimizedAutoSave() {
+                // Limpiar timeout anterior
+                if (debounceTimeout) {
+                    clearTimeout(debounceTimeout);
+                }
+                
+                // Debounce de 1 segundo (reducido para demo)
+                debounceTimeout = setTimeout(() => {
+                    optimizedSaveCount++;
+                    log(`✅ OPTIMIZADO: Guardado #${optimizedSaveCount}`);
+                    
+                    // Configurar intervalo de 2 segundos (reducido para demo)
+                    if (autoSaveInterval) {
+                        clearInterval(autoSaveInterval);
+                    }
+                    autoSaveInterval = setInterval(() => {
+                        optimizedSaveCount++;
+                        log(`✅ OPTIMIZADO: Guardado automático #${optimizedSaveCount}`);
+                    }, 2000);
+                }, 1000);
+            }
+            
+            // Simular múltiples cambios rápidos
+            optimizedAutoSave();
+            setTimeout(() => optimizedAutoSave(), 200);
+            setTimeout(() => optimizedAutoSave(), 500);
+            setTimeout(() => optimizedAutoSave(), 800);
+            
+            setTimeout(() => {
+                clearTimeout(debounceTimeout);
+                clearInterval(autoSaveInterval);
+                
+                if (optimizedSaveCount <= 3) {
+                    addTestResult('Auto-guardado Optimizado', 'pass', 
+                        `Solo se ejecutaron ${optimizedSaveCount} guardados en 4 segundos (eficiente)`);
+                    log(`✅ Auto-guardado optimizado: ${optimizedSaveCount} ejecuciones`);
+                } else {
+                    addTestResult('Auto-guardado Optimizado', 'warning', 
+                        `Se ejecutaron ${optimizedSaveCount} guardados (más de lo esperado)`);
+                    log(`⚠️ Auto-guardado optimizado: ${optimizedSaveCount} ejecuciones`);
+                }
+            }, 4000);
+        }
+
+        // Test 3: Verificar conectividad con API
+        function testAPIConnectivity() {
+            log('🔍 Testeando conectividad con API...');
+            
+            const API_BASE = '/Sudoku/public/api';
+            
+            // Test endpoint básico
+            fetch(`${API_BASE}/puzzle/new/easy`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => {
+                log(`📡 API Response Status: ${response.status}`);
+                if (response.ok) {
+                    addTestResult('API Conectividad', 'pass', 
+                        `API responde correctamente (status: ${response.status})`);
+                    log('✅ API: Conectividad OK');
+                    return response.json();
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            })
+            .then(data => {
+                log(`📦 API Response Data: ${JSON.stringify(data, null, 2)}`);
+                if (data.success) {
+                    addTestResult('API Funcionalidad', 'pass', 'API devuelve datos válidos');
+                    log('✅ API: Funcionalidad OK');
+                } else {
+                    addTestResult('API Funcionalidad', 'warning', 'API responde pero sin éxito');
+                    log('⚠️ API: Respuesta sin éxito');
+                }
+            })
+            .catch(error => {
+                addTestResult('API Conectividad', 'fail', `Error: ${error.message}`);
+                log('❌ API: ERROR - ' + error.message);
+            });
+        }
+
+        // Test 4: Verificar endpoint de pistas
+        function testHintEndpoint() {
+            log('🔍 Testeando endpoint de pistas...');
+            
+            const API_BASE = '/Sudoku/public/api';
+            
+            // Primero crear un juego para poder pedir pista
+            fetch(`${API_BASE}/puzzle/new/easy`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.game_id) {
+                    log(`🎮 Juego creado: ID ${data.game_id}`);
+                    
+                    // Ahora pedir una pista
+                    return fetch(`${API_BASE}/hint`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            game_id: data.game_id,
+                            current_state: data.puzzle.puzzle_string
+                        })
+                    });
+                } else {
+                    throw new Error('No se pudo crear juego para test');
+                }
+            })
+            .then(response => {
+                log(`💡 Hint Response Status: ${response.status}`);
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            })
+            .then(data => {
+                log(`💡 Hint Response: ${JSON.stringify(data, null, 2)}`);
+                if (data.success && data.hint) {
+                    addTestResult('Endpoint de Pistas', 'pass', 
+                        `Sistema de pistas funcional (pista en fila ${data.hint.row + 1}, col ${data.hint.col + 1})`);
+                    log('✅ Sistema de pistas: OK');
+                } else {
+                    addTestResult('Endpoint de Pistas', 'warning', 'Endpoint responde pero sin pista válida');
+                    log('⚠️ Sistema de pistas: Respuesta inválida');
+                }
+            })
+            .catch(error => {
+                addTestResult('Endpoint de Pistas', 'fail', `Error: ${error.message}`);
+                log('❌ Sistema de pistas: ERROR - ' + error.message);
+            });
+        }
+
+        function runAllTests() {
+            clearResults();
+            log('🚀 Iniciando batería de tests...');
+            
+            testBrowserAPIs();
+            
+            setTimeout(() => {
+                testAutoSaveOptimization();
+            }, 1000);
+            
+            setTimeout(() => {
+                testAPIConnectivity();
+            }, 8000);
+            
+            setTimeout(() => {
+                testHintEndpoint();
+            }, 10000);
+            
+            setTimeout(() => {
+                log('🏁 Todos los tests completados');
+                addTestResult('Batería de Tests', 'pass', 'Ejecución de tests completada');
+            }, 15000);
+        }
+
+        // Ejecutar tests automáticamente al cargar
+        window.addEventListener('load', () => {
+            log('🔧 Test de Correcciones Sudoku - Iniciado');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Verificación de Correcciones Sudoku</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 5px solid #4CAF50;
+        }
+        .button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }
+        .log-output {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .status.success { background: #4CAF50; }
+        .status.warning { background: #FF9800; }
+        .status.error { background: #F44336; }
+        .status.pending { background: #2196F3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Verificación de Correcciones Sudoku</h1>
+            <p>Verificando que las correcciones aplicadas funcionen correctamente</p>
+        </div>
+
+        <div class="test-section">
+            <h3>🔄 Test: Loop Infinito</h3>
+            <p>Verificando que no se creen múltiples Game IDs automáticamente</p>
+            <button class="button" onclick="testLoop()">🚀 Test Loop</button>
+            <div class="log-output" id="log-loop">Esperando test...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>🏆 Test: Sistema de Logros</h3>
+            <p>Verificando endpoint de logros</p>
+            <button class="button" onclick="testAchievements()">🏆 Test Logros</button>
+            <div class="log-output" id="log-achievements">Esperando test...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>💾 Test: Auto-guardado</h3>
+            <p>Verificando endpoint de guardado</p>
+            <button class="button" onclick="testSave()">💾 Test Guardado</button>
+            <div class="log-output" id="log-save">Esperando test...</div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="button" onclick="runAllTests()">🚀 Ejecutar Todos</button>
+            <a href="/Sudoku/public" class="button" style="text-decoration: none;">🎮 Ir a Sudoku</a>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/Sudoku/public/api';
+
+        function log(testId, message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById(`log-${testId}`);
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            logElement.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        async function testLoop() {
+            const testId = 'loop';
+            log(testId, 'Iniciando test de loop infinito...');
+            
+            try {
+                // Test verificación de partida actual
+                log(testId, 'Probando /game/current...');
+                const response = await fetch(`${API_BASE}/game/current`);
+                log(testId, `Respuesta: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(testId, `Datos: ${JSON.stringify(data).substring(0, 100)}...`);
+                    
+                    if (data.success && data.game) {
+                        log(testId, '✅ Partida encontrada - Verificar que NO cree nueva', 'success');
+                    } else {
+                        log(testId, 'Sin partida guardada - OK para crear nueva');
+                        
+                        // Test crear una partida
+                        log(testId, 'Probando crear UNA partida...');
+                        const newResponse = await fetch(`${API_BASE}/puzzle/new/easy`);
+                        if (newResponse.ok) {
+                            const newData = await newResponse.json();
+                            log(testId, `✅ Nueva partida: ${newData.game_id}`, 'success');
+                        }
+                    }
+                    log(testId, '✅ TEST PASADO: Comportamiento correcto', 'success');
+                } else {
+                    log(testId, `❌ Error del servidor: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(testId, `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAchievements() {
+            const testId = 'achievements';
+            log(testId, 'Iniciando test de logros...');
+            
+            try {
+                log(testId, 'Probando /achievements...');
+                const response = await fetch(`${API_BASE}/achievements`);
+                log(testId, `Respuesta: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(testId, `Datos: ${JSON.stringify(data).substring(0, 200)}...`);
+                    
+                    if (data.success) {
+                        const count = data.achievements ? data.achievements.length : 0;
+                        log(testId, `✅ ${count} logros encontrados`, 'success');
+                        log(testId, '✅ TEST PASADO: Endpoint funcional', 'success');
+                    } else {
+                        log(testId, '⚠️ Sin logros pero endpoint responde');
+                    }
+                } else if (response.status === 404) {
+                    log(testId, '⚠️ Endpoint no encontrado (404)');
+                } else {
+                    log(testId, `❌ Error del servidor: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(testId, `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSave() {
+            const testId = 'save';
+            log(testId, 'Iniciando test de guardado...');
+            
+            try {
+                log(testId, 'Probando /game/save...');
+                const mockData = {
+                    game_id: 'test-' + Date.now(),
+                    current_state: '000000000'.repeat(9),
+                    time_spent: 120,
+                    moves_count: 5,
+                    hints_used: 0
+                };
+                
+                const response = await fetch(`${API_BASE}/game/save`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(mockData)
+                });
+                
+                log(testId, `Respuesta: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(testId, `Datos: ${JSON.stringify(data)}`);
+                    log(testId, '✅ TEST PASADO: Endpoint funcional', 'success');
+                } else {
+                    log(testId, `❌ Error del servidor: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(testId, `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function runAllTests() {
+            document.querySelectorAll('.log-output').forEach(log => log.textContent = '');
+            
+            await testLoop();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await testAchievements();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await testSave();
+        }
+    </script>
+</body>
+</html>

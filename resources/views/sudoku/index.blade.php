@@ -14,16 +14,19 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/recharts@2.5.0/esm/index.js" type="module"></script>
-    <script src="https://unpkg.com/recharts@2.5.0/umd/Recharts.js"></script>
+    <!-- Usar múltiples CDN como fallback para Recharts -->
+    <script src="https://cdn.jsdelivr.net/npm/recharts@2.5.0/umd/Recharts.js" 
+            onerror="console.warn('CDN jsdelivr.net falló, intentando unpkg...');"></script>
+    <script src="https://unpkg.com/recharts@2.5.0/umd/Recharts.js" 
+            onerror="console.warn('CDN unpkg.com falló, usando fallbacks CSS');"></script>
     <script>
         // Verificar y configurar Recharts
-        console.log('Recharts disponible:', typeof window.Recharts);
+        console.log('🔧 Verificando disponibilidad de Recharts:', typeof window.Recharts);
         window.Recharts = window.Recharts || {};
         
         // Si no está disponible, crear componentes gráficos simples con CSS
         if (!window.Recharts.ResponsiveContainer) {
-            console.warn('Recharts no cargado, usando gráficos CSS');
+            console.warn('⚠️ Recharts no cargado desde CDNs, activando fallbacks CSS...');
             
             // Componente de gráfico de barras simple
             const SimpleBarChart = ({ data }) => {
@@ -80,6 +83,9 @@
                 Bar: () => React.createElement('div'),
                 Line: () => React.createElement('div')
             };
+            console.log('✅ Fallbacks CSS para Recharts configurados exitosamente');
+        } else {
+            console.log('✅ Recharts cargado exitosamente desde CDN');
         }
     </script>
     
@@ -206,6 +212,17 @@
                 // ✅ Test inicial de conectividad
                 console.log('🚀 Iniciando Sudoku App...');
                 console.log('API_BASE configurado:', API_BASE);
+                
+                // 🔧 Diagnóstico del sistema
+                console.log('🔍 Diagnóstico del sistema:');
+                console.log('  - React versión:', React.version || 'No detectada');
+                console.log('  - Recharts disponible:', typeof window.Recharts !== 'undefined');
+                console.log('  - LocalStorage disponible:', typeof localStorage !== 'undefined');
+                console.log('  - CSRF Token presente:', !!CSRF_TOKEN);
+                
+                // ✅ FORZAR carga de logros ANTES de verificar partidas
+                console.log('🏆 Forzando carga de logros...');
+                loadUserAchievements();
                 
                 // 💾 Verificar si hay una partida guardada
                 checkForSavedGame();
@@ -668,14 +685,14 @@
             
             // 💾 SISTEMA DE AUTO-GUARDADO
             
-            // Verificar si hay una partida guardada al iniciar
+            // ✅ CORRECCIÓN CRÍTICA: Verificar partidas guardadas SIN loop infinito
             const checkForSavedGame = async () => {
                 console.log('💾 Verificando partidas guardadas...');
                 try {
                     const response = await fetch(`${API_BASE}/game/current`, {
                         method: 'GET',
                         headers: getHeaders(),
-                        credentials: 'same-origin' // Importante para mantener sesión
+                        credentials: 'same-origin'
                     });
                     
                     console.log('💾 Respuesta de verificación (status):', response.status);
@@ -687,9 +704,9 @@
                         if (data.success && data.game && data.game.status === 'in_progress') {
                             console.log('💾 Partida guardada encontrada:', data.game);
                             setSavedGameData(data.game);
-                            setLoading(false); // ✅ IMPORTANTE: Quitar loading antes del modal
+                            setLoading(false);
                             setShowContinueDialog(true);
-                            return;
+                            return; // ✅ CRÍTICO: SALIR AQUÍ - No cargar nuevo puzzle
                         } else {
                             console.log('💾 No hay partidas en progreso:', data.message);
                         }
@@ -701,15 +718,18 @@
                     console.log('💾 Error al verificar partidas guardadas:', error.message);
                 }
                 
-                // Si no hay partida guardada, cargar nueva
-                console.log('💾 Cargando nuevo puzzle por defecto...');
+                // ✅ SOLO cargar nuevo puzzle si NO hay partida guardada
+                console.log('💾 No hay partida guardada, iniciando nueva...');
                 loadNewPuzzle('easy');
             };
             
-            // Cargar partida guardada
+            // ✅ CORRECCIÓN FINAL: loadSavedGame SIN loop infinito
             const loadSavedGame = () => {
                 if (!savedGameData) {
                     console.log('❌ No hay datos de partida guardada');
+                    // ✅ NO llamar startNewGame aquí
+                    setLoading(false);
+                    setShowContinueDialog(false);
                     return;
                 }
                 
@@ -734,8 +754,8 @@
                     });
                     setHintsRemaining(3 - (savedGameData.hints_used || 0));
                     setPuzzleCompleted(false);
-                    setLoading(false); // ✅ IMPORTANTE: Quitar loading
-                    setShowContinueDialog(false); // ✅ IMPORTANTE: Cerrar modal
+                    setLoading(false);
+                    setShowContinueDialog(false);
                     setHasUnsavedChanges(false);
                     setLastSaved(new Date());
                     
@@ -746,8 +766,13 @@
                     console.log('  - Pistas usadas:', savedGameData.hints_used || 0);
                 } catch (error) {
                     console.error('❌ Error cargando partida guardada:', error);
-                    // Si hay error, cargar nuevo puzzle
-                    startNewGame();
+                    // ✅ CRÍTICO: NO llamar startNewGame() - solo limpiar estado
+                    console.log('🔄 Limpiando estado después del error...');
+                    setLoading(false);
+                    setShowContinueDialog(false);
+                    setSavedGameData(null);
+                    // ✅ Cargar nuevo puzzle UNA SOLA VEZ
+                    loadNewPuzzle('easy');
                 }
             };
             
@@ -763,6 +788,11 @@
             // Auto-guardar el progreso actual
             const autoSaveGame = async () => {
                 if (!gameId || puzzleCompleted || !hasUnsavedChanges) {
+                    console.log('💾 Auto-guardado omitido:', {
+                        gameId: !!gameId,
+                        puzzleCompleted,
+                        hasUnsavedChanges
+                    });
                     return;
                 }
                 
@@ -770,6 +800,8 @@
                 console.log('💾 Auto-guardando progreso...');
                 console.log('  - Game ID:', gameId);
                 console.log('  - Board state:', board.flat().join(''));
+                console.log('  - Tiempo transcurrido:', timer);
+                console.log('  - Movimientos:', gameStats.movesCount);
                 
                 try {
                     const currentBoardString = board.flat().join('');
@@ -830,23 +862,56 @@
                 }
             };
             
-            // Marcar cambios cuando se modifica el board
+            // ✅ CORRECCIÓN: Solo marcar cambios en board y gameStats, NO timer
             useEffect(() => {
                 if (gameId && !puzzleCompleted) {
                     setHasUnsavedChanges(true);
                 }
-            }, [board, timer, gameStats]);
+            }, [board, gameStats]); // ✅ QUITAR timer de aquí
             
-            // Auto-guardar cada 10 segundos si hay cambios
+            // ✅ CORRECCIÓN FINAL: Auto-guardado cada 60 segundos exactos
             useEffect(() => {
-                if (hasUnsavedChanges && !puzzleCompleted) {
-                    const autoSaveInterval = setInterval(() => {
-                        autoSaveGame();
-                    }, 10000); // 10 segundos
+                let autoSaveInterval = null;
+                let debounceTimeout = null;
+                
+                // ✅ Condiciones más estrictas
+                if (gameId && !puzzleCompleted && hasUnsavedChanges && isPlaying) {
+                    console.log('💾 Configurando auto-guardado cada 60 segundos...');
                     
-                    return () => clearInterval(autoSaveInterval);
+                    // Debounce de 10 segundos para mayor estabilidad
+                    debounceTimeout = setTimeout(() => {
+                        console.log('💾 Iniciando auto-guardado cada 60 segundos...');
+                        
+                        // Guardar inmediatamente
+                        autoSaveGame();
+                        
+                        // Configurar intervalo de 60 segundos
+                        autoSaveInterval = setInterval(() => {
+                            console.log('💾 Ejecutando auto-guardado programado (60s)...');
+                            autoSaveGame();
+                        }, 60000); // 60 segundos exactos
+                        
+                    }, 10000); // 10 segundos de debounce
+                } else {
+                    console.log('💾 Auto-guardado no iniciado:', {
+                        gameId: !!gameId,
+                        puzzleCompleted,
+                        hasUnsavedChanges,
+                        isPlaying
+                    });
                 }
-            }, [hasUnsavedChanges, puzzleCompleted, gameId]);
+                
+                return () => {
+                    if (autoSaveInterval) {
+                        console.log('💾 Limpiando intervalo de auto-guardado...');
+                        clearInterval(autoSaveInterval);
+                    }
+                    if (debounceTimeout) {
+                        console.log('💾 Limpiando timeout de debounce...');
+                        clearTimeout(debounceTimeout);
+                    }
+                };
+            }, [gameId, puzzleCompleted, hasUnsavedChanges, isPlaying]); // ✅ Dependencias optimizadas
             
             // Guardar manualmente
             const saveGameManually = () => {
@@ -1207,7 +1272,7 @@
                 }
             };
             
-            // Cargar logros del usuario
+            // ✅ CORRECCIÓN: Cargar logros del usuario con manejo de errores
             const loadUserAchievements = async () => {
                 try {
                     const response = await fetch(`${API_BASE}/achievements`, {
@@ -1219,16 +1284,23 @@
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success) {
-                            setAchievements(data.achievements);
-                            console.log('🏆 Logros cargados:', data.achievements.length);
+                            setAchievements(data.achievements || []); // ✅ Fallback a array vacío
+                            console.log('🏆 Logros cargados exitosamente:', data.achievements?.length || 0);
+                        } else {
+                            console.log('⚠️ No se pudieron cargar logros:', data.message);
+                            setAchievements([]); // ✅ Set array vacío si falla
                         }
+                    } else {
+                        console.log('⚠️ Error del servidor al cargar logros:', response.status);
+                        setAchievements([]); // ✅ Set array vacío si falla
                     }
                 } catch (error) {
                     console.error('❌ Error cargando logros:', error);
+                    setAchievements([]); // ✅ Set array vacío si falla
                 }
             };
             
-            // Completar puzzle con verificación de logros
+            // ✅ CORRECCIÓN: Completar puzzle con verificación de logros mejorada
             const completePuzzleWithAchievements = async (finalBoard) => {
                 if (!gameId) {
                     console.log('❌ No hay gameId para completar');
@@ -1257,7 +1329,7 @@
                         
                         if (data.success) {
                             console.log('✅ Puzzle completado exitosamente');
-                            console.log('🏆 Nuevos logros:', data.new_achievements);
+                            console.log('🏆 Nuevos logros:', data.new_achievements || []);
                             
                             // 🎵 REPRODUCIR SONIDO DE ÉXITO
                             playSound.success();
@@ -1265,19 +1337,23 @@
                             // Si hay nuevos logros, mostrarlos
                             if (data.new_achievements && data.new_achievements.length > 0) {
                                 setNewAchievements(data.new_achievements);
-                                setUnlockedAchievement(data.new_achievements[0]); // Mostrar el primero
+                                setUnlockedAchievement(data.new_achievements[0]);
                                 setShowAchievementModal(true);
                                 
                                 // 🎵 REPRODUCIR SONIDO DE LOGRO
                                 setTimeout(() => playSound.achievement(), 500);
                                 
-                                // Recargar todos los logros
-                                loadUserAchievements();
+                                // ✅ IMPORTANTE: Recargar todos los logros
+                                await loadUserAchievements();
                             }
                             
                             // Mostrar mensaje de felicitación
                             setTimeout(() => {
-                                alert(`🎉 ¡FELICITACIONES! 🎉\n\n✅ Puzzle completado en: ${formatTime(timer)}\n🎯 Dificultad: ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}\n🎮 Movimientos: ${gameStats.movesCount}\n${data.new_achievements.length > 0 ? `🏆 ¡${data.new_achievements.length} nuevo${data.new_achievements.length > 1 ? 's' : ''} logro${data.new_achievements.length > 1 ? 's' : ''} desbloqueado${data.new_achievements.length > 1 ? 's' : ''}!` : '⭐ ¡Excelente trabajo!'}`);
+                                const achievementText = data.new_achievements?.length > 0 
+                                    ? `🏆 ¡${data.new_achievements.length} nuevo${data.new_achievements.length > 1 ? 's' : ''} logro${data.new_achievements.length > 1 ? 's' : ''} desbloqueado${data.new_achievements.length > 1 ? 's' : ''}!`
+                                    : '⭐ ¡Excelente trabajo!';
+                                    
+                                alert(`🎉 ¡FELICITACIONES! 🎉\n\n✅ Puzzle completado en: ${formatTime(timer)}\n🎯 Dificultad: ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}\n🎮 Movimientos: ${gameStats.movesCount}\n${achievementText}`);
                             }, 100);
                         }
                     } else {
@@ -1285,8 +1361,10 @@
                     }
                 } catch (error) {
                     console.error('❌ Error completando puzzle:', error);
-                    // Fallback al método anterior
-                    alert(`🎉 ¡FELICITACIONES! 🎉\n\n✅ Puzzle completado en: ${formatTime(timer)}\n🎯 Dificultad: ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}\n🎮 Movimientos: ${gameStats.movesCount}\n⭐ ¡Excelente trabajo!`);
+                    // ✅ Fallback al método anterior - siempre mostrar felicitación
+                    setTimeout(() => {
+                        alert(`🎉 ¡FELICITACIONES! 🎉\n\n✅ Puzzle completado en: ${formatTime(timer)}\n🎯 Dificultad: ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}\n🎮 Movimientos: ${gameStats.movesCount}\n⭐ ¡Excelente trabajo!`);
+                    }, 100);
                 }
             };
             
@@ -1331,10 +1409,10 @@
                 return false;
             };
             
-            // Cargar logros al inicializar
+            // ✅ CORRECCIÓN: Cargar logros al inicializar la aplicación
             useEffect(() => {
                 loadUserAchievements();
-            }, []);
+            }, []); // ✅ Ejecutar una sola vez al cargar la app
             
             // 📊 FUNCIONES DE ANALÍTICAS
             
@@ -2725,7 +2803,9 @@
             );
         };
 
-        ReactDOM.render(<SudokuApp />, document.getElementById('sudoku-app'));
+        // Usar la nueva API de React 18
+        const root = ReactDOM.createRoot(document.getElementById('sudoku-app'));
+        root.render(<SudokuApp />);
     </script>
 </body>
 </html>

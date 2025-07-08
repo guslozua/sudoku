@@ -1,4 +1,62 @@
-<?php
+    // 🎯 FUNCIÓN PARA VALIDAR QUE UN PUZZLE NO TENGA ERRORES
+    private function validatePuzzleBoard($puzzleString)
+    {
+        // Convertir string a array 2D
+        $board = [];
+        for ($i = 0; $i < 9; $i++) {
+            $row = [];
+            for ($j = 0; $j < 9; $j++) {
+                $row[] = intval($puzzleString[$i * 9 + $j]);
+            }
+            $board[] = $row;
+        }
+        
+        // Verificar cada celda con número
+        for ($row = 0; $row < 9; $row++) {
+            for ($col = 0; $col < 9; $col++) {
+                $num = $board[$row][$col];
+                if ($num != 0) {
+                    if ($this->hasConflictInBoard($board, $row, $col, $num)) {
+                        return false; // Puzzle inválido
+                    }
+                }
+            }
+        }
+        
+        return true; // Puzzle válido
+    }
+    
+    // 🔍 DETECTAR CONFLICTOS EN UN TABLERO
+    private function hasConflictInBoard($board, $row, $col, $num)
+    {
+        // Verificar fila
+        for ($c = 0; $c < 9; $c++) {
+            if ($c != $col && $board[$row][$c] == $num) {
+                return true;
+            }
+        }
+        
+        // Verificar columna
+        for ($r = 0; $r < 9; $r++) {
+            if ($r != $row && $board[$r][$col] == $num) {
+                return true;
+            }
+        }
+        
+        // Verificar subcuadro 3x3
+        $startRow = floor($row / 3) * 3;
+        $startCol = floor($col / 3) * 3;
+        
+        for ($r = $startRow; $r < $startRow + 3; $r++) {
+            for ($c = $startCol; $c < $startCol + 3; $c++) {
+                if (($r != $row || $c != $col) && $board[$r][$c] == $num) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }<?php
 
 namespace App\Http\Controllers;
 
@@ -29,14 +87,44 @@ class SudokuController extends Controller
                 return response()->json(['error' => 'Dificultad inválida'], 400);
             }
 
-            // Obtener puzzle aleatorio de la dificultad solicitada
-            $puzzle = DB::table('puzzles')
-                ->where('difficulty_level', $difficulty)
-                ->inRandomOrder()
-                ->first();
+            $maxAttempts = 10; // Máximo intentos para encontrar un puzzle válido
+            $attempts = 0;
+            $puzzle = null;
 
+            do {
+                $attempts++;
+                
+                // Obtener puzzle aleatorio de la dificultad solicitada (solo los válidos)
+                $candidatePuzzle = DB::table('puzzles')
+                    ->where('difficulty_level', $difficulty)
+                    ->where(function($query) {
+                        $query->where('is_valid', true)
+                              ->orWhereNull('is_valid'); // Incluir puzzles sin validar aún
+                    })
+                    ->inRandomOrder()
+                    ->first();
+
+                if (!$candidatePuzzle) {
+                    return response()->json(['error' => 'No hay puzzles disponibles'], 404);
+                }
+                
+                // 🛡️ VALIDAR QUE EL PUZZLE NO TENGA ERRORES
+                if ($this->validatePuzzleBoard($candidatePuzzle->puzzle_string)) {
+                    $puzzle = $candidatePuzzle;
+                    break; // Puzzle válido encontrado
+                } else {
+                    // Log del puzzle inválido para debugging
+                    error_log("Puzzle inválido detectado - ID: {$candidatePuzzle->id}, Intento: $attempts");
+                }
+                
+            } while ($attempts < $maxAttempts);
+            
+            // Si no encontramos un puzzle válido
             if (!$puzzle) {
-                return response()->json(['error' => 'No hay puzzles disponibles'], 404);
+                return response()->json([
+                    'error' => 'No se pudo generar un puzzle válido. Inténtalo de nuevo.',
+                    'attempts' => $attempts
+                ], 500);
             }
 
             // Obtener o crear usuario de sesión
@@ -65,7 +153,8 @@ class SudokuController extends Controller
                     'difficulty_level' => $puzzle->difficulty_level,
                     'clues_count' => $puzzle->clues_count
                 ],
-                'game_id' => $gameId
+                'game_id' => $gameId,
+                'validation_attempts' => $attempts // Para debugging
             ]);
 
         } catch (\Exception $e) {

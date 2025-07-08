@@ -513,9 +513,29 @@
                 // Solo permitir colocar números en celdas editables (no del puzzle original)
                 if (selectedCell && !puzzleCompleted && initialBoard[selectedCell.row][selectedCell.col] === 0) {
                     console.log('✅ Colocando número', number, 'en celda', selectedCell);
+                    
                     const newBoard = deepCopyBoard(board);
                     const oldValue = newBoard[selectedCell.row][selectedCell.col];
                     newBoard[selectedCell.row][selectedCell.col] = number;
+                    
+                    // 🛡️ VALIDACIÓN PREVIA - Verificar si este movimiento crearía conflictos
+                    const wouldCreateConflict = hasConflict(selectedCell.row, selectedCell.col, number);
+                    
+                    if (wouldCreateConflict && wouldCreateConflict.hasConflict) {
+                        console.log('⚠️ ADVERTENCIA: Este movimiento creará un conflicto:', {
+                            numero: number,
+                            posicion: `(${selectedCell.row}, ${selectedCell.col})`,
+                            tipo: wouldCreateConflict.conflictType,
+                            conflictos: wouldCreateConflict.conflictCells.length
+                        });
+                        
+                        // Aún permitir el movimiento (jugador puede cometer errores)
+                        // pero reproducir sonido de advertencia
+                        playSound.error();
+                    } else {
+                        // Movimiento válido, reproducir sonido normal
+                        playSound.place();
+                    }
                     
                     console.log('🔄 ACTUALIZANDO board...');
                     console.log('  Valor anterior:', oldValue);
@@ -524,21 +544,15 @@
                     
                     setBoard(newBoard);
                     
-                    // 🎵 REPRODUCIR SONIDO AL COLOCAR NÚMERO
-                    playSound.place();
-                    
-                    // 🔴 VERIFICAR ERRORES DESPUÉS DE COLOCAR NÚMERO
+                    // 🔴 VERIFICAR ERRORES DESPUÉS DE COLOCAR NÚMERO (con delay para permitir que React actualice)
                     setTimeout(() => {
                         const newErrorCells = getAllErrorCells();
                         if (newErrorCells.size > 0) {
                             console.log(`🔴 ERRORES DETECTADOS después de colocar ${number}:`);
                             newErrorCells.forEach(cellKey => {
                                 const [r, c] = cellKey.split('-').map(Number);
-                                console.log(`  - Celda (${r}, ${c}) con valor ${board[r][c]}`);
+                                console.log(`  - Celda (${r}, ${c}) con valor ${newBoard[r][c]}`);
                             });
-                            
-                            // 🎵 REPRODUCIR SONIDO DE ERROR
-                            playSound.error();
                         } else {
                             console.log(`✅ Sin errores después de colocar ${number}`);
                         }
@@ -976,28 +990,29 @@
                 loadNewPuzzle(newDifficulty);
             };
 
-            // 🤖 SISTEMA DE VALIDACIÓN DE ERRORES MEJORADO
+            // 🤖 SISTEMA DE VALIDACIÓN DE ERRORES MEJORADO Y OPTIMIZADO
             const hasConflict = (row, col, num) => {
                 if (num === 0) return false;
 
-                // Verificar fila
+                const conflictCells = [];
+
+                // Verificar fila - buscar duplicados
                 for (let c = 0; c < 9; c++) {
                     if (c !== col && board[row][c] === num) {
-                        return { type: 'row', conflictCells: [{row, col: c}] };
+                        conflictCells.push({row, col: c});
                     }
                 }
 
-                // Verificar columna
+                // Verificar columna - buscar duplicados
                 for (let r = 0; r < 9; r++) {
                     if (r !== row && board[r][col] === num) {
-                        return { type: 'column', conflictCells: [{row: r, col}] };
+                        conflictCells.push({row: r, col});
                     }
                 }
 
-                // Verificar subcuadro 3x3
+                // Verificar subcuadro 3x3 - buscar duplicados
                 const startRow = Math.floor(row / 3) * 3;
                 const startCol = Math.floor(col / 3) * 3;
-                const conflictCells = [];
                 
                 for (let r = startRow; r < startRow + 3; r++) {
                     for (let c = startCol; c < startCol + 3; c++) {
@@ -1006,40 +1021,78 @@
                         }
                     }
                 }
-                
+
+                // Si hay conflictos, retornar información detallada
                 if (conflictCells.length > 0) {
-                    return { type: 'box', conflictCells };
+                    return { 
+                        hasConflict: true,
+                        conflictCells,
+                        conflictType: conflictCells.some(cell => cell.row === row) ? 'row' :
+                                     conflictCells.some(cell => cell.col === col) ? 'column' : 'box'
+                    };
                 }
 
                 return false;
             };
             
-            // 🎯 DETECTAR TODAS LAS CELDAS EN ERROR
+            // 🎯 DETECTAR TODAS LAS CELDAS EN ERROR - VERSIÓN OPTIMIZADA
             const getAllErrorCells = () => {
                 const errorCells = new Set();
+                const processedNumbers = new Map(); // Para evitar procesar el mismo número múltiples veces
                 
+                // Primero, identificar todas las celdas con números
+                const occupiedCells = [];
                 for (let row = 0; row < 9; row++) {
                     for (let col = 0; col < 9; col++) {
                         const num = board[row][col];
                         if (num !== 0) {
-                            const conflict = hasConflict(row, col, num);
-                            if (conflict) {
-                                // Añadir la celda actual
-                                errorCells.add(`${row}-${col}`);
-                                // Añadir todas las celdas en conflicto
-                                conflict.conflictCells.forEach(cell => {
-                                    errorCells.add(`${cell.row}-${cell.col}`);
-                                });
-                            }
+                            occupiedCells.push({row, col, num});
                         }
                     }
                 }
                 
+                // Verificar conflictos para cada celda ocupada
+                occupiedCells.forEach(({row, col, num}) => {
+                    const conflict = hasConflict(row, col, num);
+                    if (conflict && conflict.hasConflict) {
+                        // Añadir la celda actual como error
+                        errorCells.add(`${row}-${col}`);
+                        
+                        // Añadir todas las celdas en conflicto
+                        conflict.conflictCells.forEach(cell => {
+                            errorCells.add(`${cell.row}-${cell.col}`);
+                        });
+                        
+                        // Log para debugging
+                        console.log(`🔴 CONFLICTO detectado:`, {
+                            celda: `(${row}, ${col})`,
+                            numero: num,
+                            tipo: conflict.conflictType,
+                            conflictos: conflict.conflictCells.length
+                        });
+                    }
+                });
+                
                 return errorCells;
             };
             
-            // 📊 CALCULAR CELDAS EN ERROR UNA SOLA VEZ
-            const errorCells = React.useMemo(() => getAllErrorCells(), [board]);
+            // 📊 CALCULAR CELDAS EN ERROR UNA SOLA VEZ - CON DEBUGGING
+            const errorCells = React.useMemo(() => {
+                const errors = getAllErrorCells();
+                
+                // Log de debugging solo cuando hay errores
+                if (errors.size > 0) {
+                    console.log(`🔴 ERRORES ENCONTRADOS: ${errors.size} celdas`);
+                    errors.forEach(cellKey => {
+                        const [r, c] = cellKey.split('-').map(Number);
+                        console.log(`  - Celda (${r}, ${c}) = ${board[r][c]}`);
+                    });
+                } else {
+                    console.log(`✅ Sin errores en el tablero`);
+                }
+                
+                return errors;
+            }, [board]);
 
             // Controles de teclado
             useEffect(() => {
@@ -2336,6 +2389,32 @@
                                     <div className="mb-4 p-4 bg-green-100 border border-green-300 rounded-lg text-green-800 text-center">
                                         <div className="text-lg font-bold">🎉 ¡Puzzle Completado! 🎉</div>
                                         <div className="text-sm mt-1">Tiempo: {formatTime(timer)} | Movimientos: {gameStats.movesCount}</div>
+                                    </div>
+                                )}
+                                
+                                {/* 🔴 INDICADOR DE ERRORES */}
+                                {errorCells.size > 0 && !puzzleCompleted && (
+                                    <div className={`mb-4 p-3 rounded-lg border max-w-md ${
+                                        isDarkMode ? 'bg-red-900 border-red-600' : 'bg-red-100 border-red-300'
+                                    }`}>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-red-500 text-lg">❌</span>
+                                            <div>
+                                                <div className={`font-semibold ${
+                                                    isDarkMode ? 'text-red-200' : 'text-red-800'
+                                                }`}>
+                                                    {errorCells.size === 1 ? 'Error detectado' : `${errorCells.size} errores detectados`}
+                                                </div>
+                                                <div className={`text-sm ${
+                                                    isDarkMode ? 'text-red-300' : 'text-red-600'
+                                                }`}>
+                                                    {errorCells.size === 1 
+                                                        ? 'Hay un número duplicado en el tablero'
+                                                        : 'Hay números duplicados en el tablero'
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 

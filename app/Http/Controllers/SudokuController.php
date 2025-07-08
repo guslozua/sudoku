@@ -8,6 +8,223 @@
             for ($j = 0; $j < 9; $j++) {
                 $row[] = intval($puzzleString[$i * 9 + $j]);
             }
+    
+    // 📊 FUNCIONES DE ANALÍTICAS AVANZADAS
+    
+    // Calcular racha actual del usuario
+    private function calculateCurrentStreak($userId)
+    {
+        try {
+            $games = DB::select("
+                SELECT DATE(completed_at) as date, COUNT(*) as puzzles
+                FROM games 
+                WHERE user_id = ? AND status = 'completed'
+                    AND completed_at IS NOT NULL
+                GROUP BY DATE(completed_at)
+                ORDER BY DATE(completed_at) DESC
+            ", [$userId]);
+            
+            if (empty($games)) return 0;
+            
+            $streak = 0;
+            $today = new \DateTime();
+            $yesterday = new \DateTime('-1 day');
+            
+            foreach ($games as $game) {
+                $gameDate = new \DateTime($game->date);
+                
+                if ($streak == 0) {
+                    // Primer juego: debe ser hoy o ayer
+                    if ($gameDate->format('Y-m-d') == $today->format('Y-m-d') ||
+                        $gameDate->format('Y-m-d') == $yesterday->format('Y-m-d')) {
+                        $streak = 1;
+                        $lastDate = $gameDate;
+                    } else {
+                        break; // No hay racha actual
+                    }
+                } else {
+                    // Verificar si es consecutivo
+                    $expectedDate = clone $lastDate;
+                    $expectedDate->modify('-1 day');
+                    
+                    if ($gameDate->format('Y-m-d') == $expectedDate->format('Y-m-d')) {
+                        $streak++;
+                        $lastDate = $gameDate;
+                    } else {
+                        break; // Se rompe la racha
+                    }
+                }
+            }
+            
+            return $streak;
+        } catch (Exception $e) {
+            Log::error('Error calculando racha actual: ' . $e->getMessage());
+            return 0;
+        }
+    }
+    
+    // Calcular mejor racha del usuario
+    private function calculateBestStreak($userId)
+    {
+        try {
+            $games = DB::select("
+                SELECT DATE(completed_at) as date
+                FROM games 
+                WHERE user_id = ? AND status = 'completed'
+                    AND completed_at IS NOT NULL
+                GROUP BY DATE(completed_at)
+                ORDER BY DATE(completed_at) ASC
+            ", [$userId]);
+            
+            if (empty($games)) return 0;
+            
+            $bestStreak = 0;
+            $currentStreak = 1;
+            $lastDate = null;
+            
+            foreach ($games as $game) {
+                $gameDate = new \DateTime($game->date);
+                
+                if ($lastDate) {
+                    $expectedDate = clone $lastDate;
+                    $expectedDate->modify('+1 day');
+                    
+                    if ($gameDate->format('Y-m-d') == $expectedDate->format('Y-m-d')) {
+                        $currentStreak++;
+                    } else {
+                        $bestStreak = max($bestStreak, $currentStreak);
+                        $currentStreak = 1;
+                    }
+                }
+                
+                $lastDate = $gameDate;
+            }
+            
+            return max($bestStreak, $currentStreak);
+        } catch (Exception $e) {
+            Log::error('Error calculando mejor racha: ' . $e->getMessage());
+            return 0;
+        }
+    }
+    
+    // 🏆 SISTEMA DE LOGROS
+    
+    public function getAchievements(Request $request)
+    {
+        try {
+            $userId = $this->getUserId($request);
+            
+            // Obtener logros del usuario
+            $userAchievements = DB::select("
+                SELECT a.*, ua.unlocked_at, ua.is_completed
+                FROM achievements a
+                LEFT JOIN user_achievements ua ON a.id = ua.achievement_id AND ua.user_id = ?
+                ORDER BY a.category, a.id
+            ", [$userId]);
+            
+            return response()->json([
+                'success' => true,
+                'achievements' => $userAchievements
+            ]);
+            
+        } catch (Exception $e) {
+            Log::error('Error en getAchievements: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error cargando logros'
+            ], 500);
+        }
+    }
+    
+    public function checkAchievements(Request $request)
+    {
+        try {
+            $userId = $this->getUserId($request);
+            
+            // Obtener estadísticas del usuario
+            $stats = $this->getUserStats($userId);
+            
+            $newAchievements = [];
+            
+            // Verificar logros de completado
+            $completionAchievements = [
+                ['games' => 1, 'name' => 'Primer Paso', 'description' => 'Completa tu primer puzzle'],
+                ['games' => 10, 'name' => 'Aficionado', 'description' => 'Completa 10 puzzles'],
+                ['games' => 50, 'name' => 'Experto', 'description' => 'Completa 50 puzzles'],
+                ['games' => 100, 'name' => 'Maestro', 'description' => 'Completa 100 puzzles']
+            ];
+            
+            foreach ($completionAchievements as $achievement) {
+                if ($stats->completed_games >= $achievement['games']) {
+                    $newAchievements[] = $this->unlockAchievement($userId, $achievement);
+                }
+            }
+            
+            // Verificar logros de velocidad
+            if ($stats->best_time && $stats->best_time <= 300) { // 5 minutos
+                $newAchievements[] = $this->unlockAchievement($userId, [
+                    'name' => 'Velocista',
+                    'description' => 'Completa un puzzle en menos de 5 minutos'
+                ]);
+            }
+            
+            return response()->json([
+                'success' => true,
+                'new_achievements' => array_filter($newAchievements)
+            ]);
+            
+        } catch (Exception $e) {
+            Log::error('Error en checkAchievements: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error verificando logros'
+            ], 500);
+        }
+    }
+    
+    private function unlockAchievement($userId, $achievementData)
+    {
+        try {
+            // Verificar si ya está desbloqueado
+            $exists = DB::table('user_achievements')
+                ->where('user_id', $userId)
+                ->where('achievement_name', $achievementData['name'])
+                ->exists();
+            
+            if (!$exists) {
+                DB::table('user_achievements')->insert([
+                    'user_id' => $userId,
+                    'achievement_name' => $achievementData['name'],
+                    'achievement_description' => $achievementData['description'],
+                    'is_completed' => true,
+                    'unlocked_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
+                
+                return $achievementData;
+            }
+            
+            return null;
+        } catch (Exception $e) {
+            Log::error('Error desbloqueando logro: ' . $e->getMessage());
+            return null;
+        }
+    }
+    
+    private function getUserStats($userId)
+    {
+        return DB::selectOne("
+            SELECT 
+                COUNT(*) as total_games,
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_games,
+                MIN(CASE WHEN status = 'completed' THEN completion_time END) as best_time,
+                AVG(CASE WHEN status = 'completed' THEN completion_time END) as avg_time
+            FROM games 
+            WHERE user_id = ?
+        ", [$userId]);
+    }
+}
             $board[] = $row;
         }
         
@@ -983,6 +1200,104 @@ class SudokuController extends Controller
             error_log("📊 Estadísticas diarias actualizadas para usuario $userId");
         } catch (Exception $e) {
             error_log("❌ Error actualizando estadísticas diarias: " . $e->getMessage());
+        }
+    }
+    
+    // 📊 FUNCIONES DE ANALÍTICAS AVANZADAS
+    
+    // Calcular racha actual del usuario
+    private function calculateCurrentStreak($userId)
+    {
+        try {
+            $games = DB::select("
+                SELECT DATE(completed_at) as date, COUNT(*) as puzzles
+                FROM games 
+                WHERE user_id = ? AND status = 'completed'
+                    AND completed_at IS NOT NULL
+                GROUP BY DATE(completed_at)
+                ORDER BY DATE(completed_at) DESC
+            ", [$userId]);
+            
+            if (empty($games)) return 0;
+            
+            $streak = 0;
+            $today = new \DateTime();
+            $yesterday = new \DateTime('-1 day');
+            
+            foreach ($games as $game) {
+                $gameDate = new \DateTime($game->date);
+                
+                if ($streak == 0) {
+                    // Primer juego: debe ser hoy o ayer
+                    if ($gameDate->format('Y-m-d') == $today->format('Y-m-d') ||
+                        $gameDate->format('Y-m-d') == $yesterday->format('Y-m-d')) {
+                        $streak = 1;
+                        $lastDate = $gameDate;
+                    } else {
+                        break; // No hay racha actual
+                    }
+                } else {
+                    // Verificar si es consecutivo
+                    $expectedDate = clone $lastDate;
+                    $expectedDate->modify('-1 day');
+                    
+                    if ($gameDate->format('Y-m-d') == $expectedDate->format('Y-m-d')) {
+                        $streak++;
+                        $lastDate = $gameDate;
+                    } else {
+                        break; // Se rompe la racha
+                    }
+                }
+            }
+            
+            return $streak;
+        } catch (Exception $e) {
+            error_log('Error calculando racha actual: ' . $e->getMessage());
+            return 0;
+        }
+    }
+    
+    // Calcular mejor racha del usuario
+    private function calculateBestStreak($userId)
+    {
+        try {
+            $games = DB::select("
+                SELECT DATE(completed_at) as date
+                FROM games 
+                WHERE user_id = ? AND status = 'completed'
+                    AND completed_at IS NOT NULL
+                GROUP BY DATE(completed_at)
+                ORDER BY DATE(completed_at) ASC
+            ", [$userId]);
+            
+            if (empty($games)) return 0;
+            
+            $bestStreak = 0;
+            $currentStreak = 1;
+            $lastDate = null;
+            
+            foreach ($games as $game) {
+                $gameDate = new \DateTime($game->date);
+                
+                if ($lastDate) {
+                    $expectedDate = clone $lastDate;
+                    $expectedDate->modify('+1 day');
+                    
+                    if ($gameDate->format('Y-m-d') == $expectedDate->format('Y-m-d')) {
+                        $currentStreak++;
+                    } else {
+                        $bestStreak = max($bestStreak, $currentStreak);
+                        $currentStreak = 1;
+                    }
+                }
+                
+                $lastDate = $gameDate;
+            }
+            
+            return max($bestStreak, $currentStreak);
+        } catch (Exception $e) {
+            error_log('Error calculando mejor racha: ' . $e->getMessage());
+            return 0;
         }
     }
 }

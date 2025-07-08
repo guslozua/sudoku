@@ -35,4 +35,12 @@ $routes = [
     // Configuración de usuario
     'GET:/user/settings' => ['GameController', 'getUserSettings'],
     'POST:/user/settings' => ['GameController', 'updateUserSettings'],
+    
+    // Rutas de logros
+    'GET:/achievements' => ['SudokuController', 'getAchievements'],
+    'POST:/achievements/check' => ['SudokuController', 'checkAchievements'],
+    
+    // Rutas de analíticas
+    'GET:/analytics/dashboard' => ['SudokuController', 'getDashboardAnalytics'],
+    'GET:/analytics/progress' => ['SudokuController', 'getProgressAnalytics'],
 ];

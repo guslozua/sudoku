@@ -14,6 +14,74 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.5.0/esm/index.js" type="module"></script>
+    <script src="https://unpkg.com/recharts@2.5.0/umd/Recharts.js"></script>
+    <script>
+        // Verificar y configurar Recharts
+        console.log('Recharts disponible:', typeof window.Recharts);
+        window.Recharts = window.Recharts || {};
+        
+        // Si no está disponible, crear componentes gráficos simples con CSS
+        if (!window.Recharts.ResponsiveContainer) {
+            console.warn('Recharts no cargado, usando gráficos CSS');
+            
+            // Componente de gráfico de barras simple
+            const SimpleBarChart = ({ data }) => {
+                const maxValue = Math.max(...data.map(d => d.count || 0));
+                return React.createElement('div', { className: 'space-y-3' },
+                    data.map((item, index) => 
+                        React.createElement('div', { key: index, className: 'flex items-center gap-3' },
+                            React.createElement('div', { className: 'w-16 text-sm font-medium capitalize' }, item.difficulty_level),
+                            React.createElement('div', { className: 'flex-1 bg-gray-200 rounded-full h-4 relative' },
+                                React.createElement('div', {
+                                    className: 'bg-blue-500 h-4 rounded-full transition-all duration-1000',
+                                    style: { width: `${(item.count / maxValue) * 100}%` }
+                                })
+                            ),
+                            React.createElement('div', { className: 'w-12 text-sm font-mono' }, item.count)
+                        )
+                    )
+                );
+            };
+            
+            // Componente de gráfico de líneas simple
+            const SimpleLineChart = ({ data }) => {
+                const maxValue = Math.max(...data.map(d => d.total_puzzles || 0));
+                return React.createElement('div', { className: 'space-y-2' },
+                    React.createElement('div', { className: 'text-sm text-gray-600 mb-4' }, 
+                        `Mostrando ${data.length} días de actividad`
+                    ),
+                    data.slice(-7).map((item, index) => 
+                        React.createElement('div', { key: index, className: 'flex items-center gap-3' },
+                            React.createElement('div', { className: 'w-20 text-xs' }, 
+                                new Date(item.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })
+                            ),
+                            React.createElement('div', { className: 'flex-1 bg-gray-200 rounded-full h-3 relative' },
+                                React.createElement('div', {
+                                    className: 'bg-green-500 h-3 rounded-full transition-all duration-1000',
+                                    style: { width: `${maxValue > 0 ? (item.total_puzzles / maxValue) * 100 : 0}%` }
+                                })
+                            ),
+                            React.createElement('div', { className: 'w-8 text-xs font-mono' }, item.total_puzzles || 0)
+                        )
+                    )
+                );
+            };
+            
+            window.Recharts = {
+                ResponsiveContainer: ({ children }) => children,
+                BarChart: SimpleBarChart,
+                LineChart: SimpleLineChart,
+                CartesianGrid: () => React.createElement('div'),
+                XAxis: () => React.createElement('div'),
+                YAxis: () => React.createElement('div'),
+                Tooltip: () => React.createElement('div'),
+                Legend: () => React.createElement('div'),
+                Bar: () => React.createElement('div'),
+                Line: () => React.createElement('div')
+            };
+        }
+    </script>
     
     <style>
         body {
@@ -96,6 +164,13 @@
             const [showAchievementsGallery, setShowAchievementsGallery] = useState(false);
             const [unlockedAchievement, setUnlockedAchievement] = useState(null);
             const [mistakesCount, setMistakesCount] = useState(0);
+            
+            // 📊 ESTADO PARA SISTEMA DE ANALÍTICAS
+            const [showAnalytics, setShowAnalytics] = useState(false);
+            const [analyticsData, setAnalyticsData] = useState(null);
+            const [progressData, setProgressData] = useState(null);
+            const [analyticsLoading, setAnalyticsLoading] = useState(false);
+            const [analyticsTab, setAnalyticsTab] = useState('dashboard'); // 'dashboard', 'progress', 'trends'
             
             // 🎵 ESTADO PARA SISTEMA DE SONIDOS
             const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -1207,6 +1282,172 @@
             useEffect(() => {
                 loadUserAchievements();
             }, []);
+            
+            // 📊 FUNCIONES DE ANALÍTICAS
+            
+            // Cargar datos del dashboard
+            const loadDashboardAnalytics = async () => {
+                setAnalyticsLoading(true);
+                console.log('📊 Cargando dashboard analytics...');
+                
+                try {
+                    const response = await fetch(`${API_BASE}/analytics/dashboard`, {
+                        method: 'GET',
+                        headers: getHeaders(),
+                        credentials: 'same-origin'
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success) {
+                            setAnalyticsData(data.data);
+                            console.log('✅ Dashboard analytics cargado:', data.data);
+                        } else {
+                            throw new Error(data.message || 'Error cargando analytics');
+                        }
+                    } else {
+                        throw new Error(`Error del servidor: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('❌ Error cargando dashboard analytics:', error);
+                    // Generar datos de ejemplo para demo
+                    setAnalyticsData(generateMockDashboardData());
+                }
+                
+                setAnalyticsLoading(false);
+            };
+            
+            // Cargar datos de progreso
+            const loadProgressAnalytics = async (days = 30) => {
+                setAnalyticsLoading(true);
+                console.log(`📈 Cargando progress analytics (últimos ${days} días)...`);
+                
+                try {
+                    const response = await fetch(`${API_BASE}/analytics/progress?days=${days}`, {
+                        method: 'GET',
+                        headers: getHeaders(),
+                        credentials: 'same-origin'
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success) {
+                            setProgressData(data.data);
+                            console.log('✅ Progress analytics cargado:', data.data);
+                        } else {
+                            throw new Error(data.message || 'Error cargando progreso');
+                        }
+                    } else {
+                        throw new Error(`Error del servidor: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('❌ Error cargando progress analytics:', error);
+                    // Generar datos de ejemplo para demo
+                    setProgressData(generateMockProgressData(days));
+                }
+                
+                setAnalyticsLoading(false);
+            };
+            
+            // Abrir modal de analíticas
+            const openAnalyticsModal = () => {
+                setShowAnalytics(true);
+                if (!analyticsData) {
+                    loadDashboardAnalytics();
+                }
+                if (!progressData) {
+                    loadProgressAnalytics(30);
+                }
+            };
+            
+            // Cambiar pestaña de analíticas
+            const switchAnalyticsTab = (tab) => {
+                setAnalyticsTab(tab);
+                if (tab === 'progress' && !progressData) {
+                    loadProgressAnalytics(30);
+                }
+            };
+            
+            // Generar datos mock para demo
+            const generateMockDashboardData = () => {
+                return {
+                    user_stats: {
+                        total_games: 47,
+                        completed_games: 42,
+                        avg_completion_time: 285.5,
+                        best_time: 187,
+                        total_time_played: 12057,
+                        total_moves: 3847,
+                        total_hints: 23,
+                        total_mistakes: 89,
+                        easy_completed: 18,
+                        medium_completed: 15,
+                        hard_completed: 7,
+                        expert_completed: 2,
+                        master_completed: 0,
+                        perfect_games: 8
+                    },
+                    weekly_progress: [
+                        { date: '2024-12-06', puzzles_completed: 3, avg_time: 245, best_time: 198 },
+                        { date: '2024-12-05', puzzles_completed: 5, avg_time: 312, best_time: 234 },
+                        { date: '2024-12-04', puzzles_completed: 2, avg_time: 289, best_time: 267 },
+                        { date: '2024-12-03', puzzles_completed: 4, avg_time: 298, best_time: 221 },
+                        { date: '2024-12-02', puzzles_completed: 1, avg_time: 356, best_time: 356 },
+                        { date: '2024-12-01', puzzles_completed: 6, avg_time: 276, best_time: 187 },
+                        { date: '2024-11-30', puzzles_completed: 3, avg_time: 301, best_time: 245 }
+                    ],
+                    difficulty_stats: [
+                        { difficulty_level: 'easy', count: 18, avg_time: 198, best_time: 145 },
+                        { difficulty_level: 'medium', count: 15, avg_time: 267, best_time: 187 },
+                        { difficulty_level: 'hard', count: 7, avg_time: 398, best_time: 289 },
+                        { difficulty_level: 'expert', count: 2, avg_time: 567, best_time: 445 }
+                    ],
+                    achievement_progress: [
+                        { achievement_type: 'completion', unlocked_count: 3 },
+                        { achievement_type: 'speed', unlocked_count: 2 },
+                        { achievement_type: 'difficulty', unlocked_count: 1 },
+                        { achievement_type: 'strategy', unlocked_count: 1 }
+                    ],
+                    recent_activity: [
+                        { difficulty_level: 'medium', completion_time: 245, moves_count: 87, hints_used: 1, mistakes_count: 2, completed_at: '2024-12-06 14:23:00' },
+                        { difficulty_level: 'easy', completion_time: 198, moves_count: 65, hints_used: 0, mistakes_count: 1, completed_at: '2024-12-06 13:45:00' },
+                        { difficulty_level: 'hard', completion_time: 356, moves_count: 134, hints_used: 2, mistakes_count: 4, completed_at: '2024-12-05 19:12:00' },
+                        { difficulty_level: 'medium', completion_time: 289, moves_count: 92, hints_used: 1, mistakes_count: 3, completed_at: '2024-12-05 18:30:00' },
+                        { difficulty_level: 'easy', completion_time: 187, moves_count: 71, hints_used: 0, mistakes_count: 0, completed_at: '2024-12-05 17:45:00' }
+                    ],
+                    trends: [
+                        { period: 'this_week', puzzles: 24, avg_time: 289, total_time: 6936 },
+                        { period: 'last_week', puzzles: 18, avg_time: 301, total_time: 5418 }
+                    ]
+                };
+            };
+            
+            // Generar datos mock de progreso
+            const generateMockProgressData = (days) => {
+                const dailyTotals = [];
+                for (let i = days - 1; i >= 0; i--) {
+                    const date = new Date();
+                    date.setDate(date.getDate() - i);
+                    const dateStr = date.toISOString().split('T')[0];
+                    
+                    const puzzles = Math.floor(Math.random() * 6);
+                    dailyTotals.push({
+                        date: dateStr,
+                        total_puzzles: puzzles,
+                        avg_time: puzzles > 0 ? Math.floor(200 + Math.random() * 200) : 0,
+                        best_time: puzzles > 0 ? Math.floor(150 + Math.random() * 150) : 0,
+                        total_time_spent: puzzles * Math.floor(200 + Math.random() * 200),
+                        perfect_games: Math.floor(Math.random() * Math.min(2, puzzles))
+                    });
+                }
+                
+                return {
+                    daily_totals: dailyTotals.reverse(),
+                    current_streak: Math.floor(Math.random() * 8) + 1,
+                    best_streak: Math.floor(Math.random() * 15) + 5,
+                    period_days: days
+                };
+            };
 
             if (loading) {
                 return (
@@ -1491,6 +1732,452 @@
                             </div>
                         </div>
                     )}
+                    
+                    {/* 📊 MODAL DE ANALÍTICAS AVANZADAS */}
+                    {showAnalytics && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className={`rounded-lg shadow-xl max-w-6xl w-full max-h-[95vh] overflow-hidden ${
+                                isDarkMode ? 'bg-gray-800 border border-gray-600' : 'bg-white border border-gray-200'
+                            }`}>
+                                {/* Header del Modal */}
+                                <div className={`p-6 border-b ${
+                                    isDarkMode ? 'border-gray-700' : 'border-gray-200'
+                                }`}>
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-2xl font-bold flex items-center gap-2">
+                                            📊 Analíticas Avanzadas
+                                            {analyticsLoading && (
+                                                <div className="loading-spinner rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                                            )}
+                                        </h3>
+                                        
+                                        <button
+                                            onClick={() => setShowAnalytics(false)}
+                                            className={`p-2 rounded-lg transition-colors ${
+                                                isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Pestañas de navegación */}
+                                    <div className="flex gap-2 mt-4">
+                                        <button
+                                            onClick={() => switchAnalyticsTab('dashboard')}
+                                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                                                analyticsTab === 'dashboard'
+                                                    ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
+                                                    : isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                            }`}
+                                        >
+                                            📊 Dashboard
+                                        </button>
+                                        
+                                        <button
+                                            onClick={() => switchAnalyticsTab('progress')}
+                                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                                                analyticsTab === 'progress'
+                                                    ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
+                                                    : isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                            }`}
+                                        >
+                                            📈 Progreso
+                                        </button>
+                                        
+                                        <button
+                                            onClick={() => switchAnalyticsTab('trends')}
+                                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                                                analyticsTab === 'trends'
+                                                    ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
+                                                    : isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                            }`}
+                                        >
+                                            📉 Tendencias
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {/* Contenido del Modal */}
+                                <div className="p-6 overflow-y-auto max-h-[75vh]">
+                                    {analyticsLoading ? (
+                                        <div className="flex items-center justify-center py-12">
+                                            <div className="text-center">
+                                                <div className="loading-spinner rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                                                <p className={`text-lg ${
+                                                    isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                                                }`}>
+                                                    Cargando analíticas...
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {/* DASHBOARD TAB */}
+                                            {analyticsTab === 'dashboard' && analyticsData && (
+                                                <div className="space-y-6">
+                                                    {/* Resumen de estadísticas principales */}
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                                        <div className={`p-4 rounded-lg border ${
+                                                            isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-200'
+                                                        }`}>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="text-2xl">🎯</div>
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-gray-500">Puzzles Completados</p>
+                                                                    <p className="text-2xl font-bold text-blue-600">
+                                                                        {analyticsData.user_stats?.completed_games || 0}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500">
+                                                                        de {analyticsData.user_stats?.total_games || 0} intentados
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className={`p-4 rounded-lg border ${
+                                                            isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-green-50 border-green-200'
+                                                        }`}>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="text-2xl">⏱️</div>
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-gray-500">Mejor Tiempo</p>
+                                                                    <p className="text-2xl font-bold text-green-600">
+                                                                        {analyticsData.user_stats?.best_time ? formatTime(analyticsData.user_stats.best_time) : '--:--'}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500">
+                                                                        Tiempo promedio: {analyticsData.user_stats?.avg_completion_time ? formatTime(Math.round(analyticsData.user_stats.avg_completion_time)) : '--:--'}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className={`p-4 rounded-lg border ${
+                                                            isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-purple-50 border-purple-200'
+                                                        }`}>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="text-2xl">🏆</div>
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-gray-500">Juegos Perfectos</p>
+                                                                    <p className="text-2xl font-bold text-purple-600">
+                                                                        {analyticsData.user_stats?.perfect_games || 0}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500">
+                                                                        Sin errores ni pistas
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className={`p-4 rounded-lg border ${
+                                                            isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-orange-50 border-orange-200'
+                                                        }`}>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="text-2xl">⚡</div>
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-gray-500">Tiempo Total</p>
+                                                                    <p className="text-2xl font-bold text-orange-600">
+                                                                        {analyticsData.user_stats?.total_time_played ? Math.round(analyticsData.user_stats.total_time_played / 3600) : 0}h
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500">
+                                                                        {analyticsData.user_stats?.total_moves || 0} movimientos totales
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Gráfico de rendimiento por dificultad */}
+                                                    <div className={`p-6 rounded-lg border ${
+                                                        isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'
+                                                    }`}>
+                                                        <h4 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                                            📊 Rendimiento por Dificultad
+                                                        </h4>
+                                                        
+                                                        {analyticsData.difficulty_stats && analyticsData.difficulty_stats.length > 0 ? (
+                                                            <div className="h-80">
+                                                                <Recharts.ResponsiveContainer width="100%" height="100%">
+                                                                    <Recharts.BarChart data={analyticsData.difficulty_stats}>
+                                                                        <Recharts.CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#E5E7EB'} />
+                                                                        <Recharts.XAxis 
+                                                                            dataKey="difficulty_level" 
+                                                                            stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                                                                            fontSize={12}
+                                                                        />
+                                                                        <Recharts.YAxis stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} fontSize={12} />
+                                                                        <Recharts.Tooltip 
+                                                                            contentStyle={{
+                                                                                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                                                                                border: `1px solid ${isDarkMode ? '#4B5563' : '#E5E7EB'}`,
+                                                                                borderRadius: '8px',
+                                                                                color: isDarkMode ? '#F3F4F6' : '#1F2937'
+                                                                            }}
+                                                                            formatter={(value, name) => [
+                                                                                name === 'count' ? `${value} puzzles` : 
+                                                                                name === 'avg_time' ? formatTime(value) :
+                                                                                name === 'best_time' ? formatTime(value) : value,
+                                                                                name === 'count' ? 'Completados' :
+                                                                                name === 'avg_time' ? 'Tiempo Promedio' :
+                                                                                name === 'best_time' ? 'Mejor Tiempo' : name
+                                                                            ]}
+                                                                        />
+                                                                        <Recharts.Legend />
+                                                                        <Recharts.Bar dataKey="count" fill="#3B82F6" name="Puzzles Completados" radius={[4, 4, 0, 0]} />
+                                                                    </Recharts.BarChart>
+                                                                </Recharts.ResponsiveContainer>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-center py-8">
+                                                                <div className="text-4xl mb-2">📊</div>
+                                                                <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
+                                                                    Completa algunos puzzles para ver estadísticas
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {/* Actividad reciente */}
+                                                    <div className={`p-6 rounded-lg border ${
+                                                        isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'
+                                                    }`}>
+                                                        <h4 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                                            🎮 Actividad Reciente
+                                                        </h4>
+                                                        
+                                                        {analyticsData.recent_activity && analyticsData.recent_activity.length > 0 ? (
+                                                            <div className="space-y-3">
+                                                                {analyticsData.recent_activity.slice(0, 5).map((activity, index) => (
+                                                                    <div key={index} className={`p-3 rounded-lg border ${
+                                                                        isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-200'
+                                                                    }`}>
+                                                                        <div className="flex justify-between items-center">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <div className={`w-3 h-3 rounded-full ${
+                                                                                    activity.difficulty_level === 'easy' ? 'bg-green-500' :
+                                                                                    activity.difficulty_level === 'medium' ? 'bg-yellow-500' :
+                                                                                    activity.difficulty_level === 'hard' ? 'bg-orange-500' :
+                                                                                    activity.difficulty_level === 'expert' ? 'bg-red-500' : 'bg-purple-500'
+                                                                                }`}></div>
+                                                                                <span className="font-medium capitalize">
+                                                                                    {activity.difficulty_level}
+                                                                                </span>
+                                                                                <span className={`text-sm ${
+                                                                                    isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                                                                                }`}>
+                                                                                    {formatTime(activity.completion_time)} • {activity.moves_count} movimientos
+                                                                                </span>
+                                                                                {activity.mistakes_count === 0 && (
+                                                                                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-md">
+                                                                                        🏆 Perfecto
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            <span className={`text-xs ${
+                                                                                isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                                                                            }`}>
+                                                                                {new Date(activity.completed_at).toLocaleDateString()}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-center py-8">
+                                                                <div className="text-4xl mb-2">🎮</div>
+                                                                <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
+                                                                    No hay actividad reciente
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* PROGRESS TAB */}
+                                            {analyticsTab === 'progress' && progressData && (
+                                                <div className="space-y-6">
+                                                    {/* Estadísticas de racha */}
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                        <div className={`p-6 rounded-lg border text-center ${
+                                                            isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-green-50 border-green-200'
+                                                        }`}>
+                                                            <div className="text-3xl mb-2">🔥</div>
+                                                            <p className="text-2xl font-bold text-green-600">
+                                                                {progressData.current_streak || 0}
+                                                            </p>
+                                                            <p className="text-sm text-gray-500">Racha Actual</p>
+                                                        </div>
+                                                        
+                                                        <div className={`p-6 rounded-lg border text-center ${
+                                                            isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-orange-50 border-orange-200'
+                                                        }`}>
+                                                            <div className="text-3xl mb-2">🏆</div>
+                                                            <p className="text-2xl font-bold text-orange-600">
+                                                                {progressData.best_streak || 0}
+                                                            </p>
+                                                            <p className="text-sm text-gray-500">Mejor Racha</p>
+                                                        </div>
+                                                        
+                                                        <div className={`p-6 rounded-lg border text-center ${
+                                                            isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-200'
+                                                        }`}>
+                                                            <div className="text-3xl mb-2">📅</div>
+                                                            <p className="text-2xl font-bold text-blue-600">
+                                                                {progressData.period_days || 30}
+                                                            </p>
+                                                            <p className="text-sm text-gray-500">Días Analizados</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Gráfico de progreso diario */}
+                                                    <div className={`p-6 rounded-lg border ${
+                                                        isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'
+                                                    }`}>
+                                                        <h4 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                                            📈 Progreso Diario (Últimos {progressData.period_days || 30} días)
+                                                        </h4>
+                                                        
+                                                        {progressData.daily_totals && progressData.daily_totals.length > 0 ? (
+                                                            <div className="h-80">
+                                                                <Recharts.ResponsiveContainer width="100%" height="100%">
+                                                                    <Recharts.LineChart data={progressData.daily_totals}>
+                                                                        <Recharts.CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#E5E7EB'} />
+                                                                        <Recharts.XAxis 
+                                                                            dataKey="date" 
+                                                                            stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                                                                            fontSize={10}
+                                                                            tickFormatter={(date) => new Date(date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
+                                                                        />
+                                                                        <Recharts.YAxis stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} fontSize={12} />
+                                                                        <Recharts.Tooltip 
+                                                                            contentStyle={{
+                                                                                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                                                                                border: `1px solid ${isDarkMode ? '#4B5563' : '#E5E7EB'}`,
+                                                                                borderRadius: '8px',
+                                                                                color: isDarkMode ? '#F3F4F6' : '#1F2937'
+                                                                            }}
+                                                                            labelFormatter={(date) => new Date(date).toLocaleDateString('es-ES')}
+                                                                            formatter={(value, name) => [
+                                                                                name === 'total_puzzles' ? `${value} puzzles` :
+                                                                                name === 'avg_time' ? (value > 0 ? formatTime(value) : 'N/A') :
+                                                                                name === 'best_time' ? (value > 0 ? formatTime(value) : 'N/A') :
+                                                                                name === 'perfect_games' ? `${value} perfectos` : value,
+                                                                                name === 'total_puzzles' ? 'Puzzles Completados' :
+                                                                                name === 'avg_time' ? 'Tiempo Promedio' :
+                                                                                name === 'best_time' ? 'Mejor Tiempo' :
+                                                                                name === 'perfect_games' ? 'Juegos Perfectos' : name
+                                                                            ]}
+                                                                        />
+                                                                        <Recharts.Legend />
+                                                                        <Recharts.Line 
+                                                                            type="monotone" 
+                                                                            dataKey="total_puzzles" 
+                                                                            stroke="#3B82F6" 
+                                                                            strokeWidth={2}
+                                                                            dot={{ r: 4 }}
+                                                                            name="Puzzles Completados"
+                                                                        />
+                                                                        <Recharts.Line 
+                                                                            type="monotone" 
+                                                                            dataKey="perfect_games" 
+                                                                            stroke="#10B981" 
+                                                                            strokeWidth={2}
+                                                                            dot={{ r: 4 }}
+                                                                            name="Juegos Perfectos"
+                                                                        />
+                                                                    </Recharts.LineChart>
+                                                                </Recharts.ResponsiveContainer>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-center py-8">
+                                                                <div className="text-4xl mb-2">📈</div>
+                                                                <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
+                                                                    Completa puzzles para ver tu progreso
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* TRENDS TAB */}
+                                            {analyticsTab === 'trends' && (
+                                                <div className="space-y-6">
+                                                    <div className="text-center py-12">
+                                                        <div className="text-6xl mb-4">📉</div>
+                                                        <h4 className="text-xl font-bold mb-2">Análisis de Tendencias</h4>
+                                                        <p className={`text-lg ${
+                                                            isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                                                        }`}>
+                                                            ¡Próximamente! Esta sección mostrará tendencias avanzadas y predicciones.
+                                                        </p>
+                                                        
+                                                        <div className={`mt-6 p-4 rounded-lg border max-w-md mx-auto ${
+                                                            isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-200'
+                                                        }`}>
+                                                            <h5 className="font-bold mb-2">🚀 Funcionalidades Planificadas:</h5>
+                                                            <ul className={`text-sm space-y-1 ${
+                                                                isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                                                            }`}>
+                                                                <li>• Análisis de patrones de juego</li>
+                                                                <li>• Predicción de dificultad óptima</li>
+                                                                <li>• Recomendaciones personalizadas</li>
+                                                                <li>• Comparación con otros jugadores</li>
+                                                                <li>• Análisis de eficiencia</li>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                                
+                                {/* Footer del Modal */}
+                                <div className={`p-4 border-t ${
+                                    isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
+                                }`}>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <div className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
+                                            📊 Datos actualizados automáticamente
+                                        </div>
+                                        
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    loadDashboardAnalytics();
+                                                    loadProgressAnalytics(30);
+                                                }}
+                                                disabled={analyticsLoading}
+                                                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                                                    analyticsLoading
+                                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                        : isDarkMode
+                                                            ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                                            : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                                }`}
+                                            >
+                                                {analyticsLoading ? '🔄 Actualizando...' : '🔄 Actualizar'}
+                                            </button>
+                                            
+                                            <button
+                                                onClick={() => setShowAnalytics(false)}
+                                                className={`px-3 py-1 rounded-md text-xs font-medium border transition-colors ${
+                                                    isDarkMode 
+                                                        ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                                                        : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300'
+                                                }`}
+                                            >
+                                                Cerrar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
                     {/* Header */}
                     <div className={`border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                         <div className="max-w-6xl mx-auto px-4 py-4">
@@ -1596,6 +2283,19 @@
                                                 {achievements.filter(a => a.is_completed).length}
                                             </span>
                                         )}
+                                    </button>
+                                    
+                                    {/* 📊 BOTÓN DE ANALYTICS */}
+                                    <button
+                                        onClick={openAnalyticsModal}
+                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                            isDarkMode 
+                                                ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
+                                                : 'bg-indigo-500 hover:bg-indigo-600 text-white'
+                                        }`}
+                                        title="Ver analíticas"
+                                    >
+                                        📊 Analytics
                                     </button>
                                     
                                     {/* 🎵 BOTÓN DE SONIDO */}

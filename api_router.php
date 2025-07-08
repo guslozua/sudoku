@@ -600,6 +600,89 @@ try {
             }
         }
         
+        // GET /analytics/dashboard
+        if ($requestUri === '/analytics/dashboard') {
+            error_log("📊 Ruta de dashboard analítico detectada: /analytics/dashboard");
+            
+            try {
+                $sessionId = $_SESSION['sudoku_session_id'] ?? null;
+                if (!$sessionId) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => 'No hay sesión activa']);
+                    exit;
+                }
+                
+                $stmt = $controller->getPdo()->prepare("SELECT id FROM users WHERE session_id = ?");
+                $stmt->execute([$sessionId]);
+                $user = $stmt->fetch();
+                
+                if (!$user) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => 'Usuario no encontrado']);
+                    exit;
+                }
+                
+                $userId = $user['id'];
+                
+                // Obtener estadísticas del dashboard
+                $dashboardData = $controller->getDashboardAnalytics($userId);
+                
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true,
+                    'data' => $dashboardData
+                ]);
+                exit;
+            } catch (Exception $e) {
+                error_log("❌ Error obteniendo analytics: " . $e->getMessage());
+                header('Content-Type: application/json');
+                echo json_encode(['error' => 'Error al obtener analytics: ' . $e->getMessage(), 'success' => false]);
+                exit;
+            }
+        }
+        
+        // GET /analytics/progress
+        if ($requestUri === '/analytics/progress') {
+            error_log("📈 Ruta de progreso detectada: /analytics/progress");
+            
+            try {
+                $sessionId = $_SESSION['sudoku_session_id'] ?? null;
+                if (!$sessionId) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => 'No hay sesión activa']);
+                    exit;
+                }
+                
+                $stmt = $controller->getPdo()->prepare("SELECT id FROM users WHERE session_id = ?");
+                $stmt->execute([$sessionId]);
+                $user = $stmt->fetch();
+                
+                if (!$user) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => 'Usuario no encontrado']);
+                    exit;
+                }
+                
+                $userId = $user['id'];
+                $days = $_GET['days'] ?? 30; // Por defecto 30 días
+                
+                // Obtener datos de progreso
+                $progressData = $controller->getProgressAnalytics($userId, $days);
+                
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true,
+                    'data' => $progressData
+                ]);
+                exit;
+            } catch (Exception $e) {
+                error_log("❌ Error obteniendo progreso: " . $e->getMessage());
+                header('Content-Type: application/json');
+                echo json_encode(['error' => 'Error al obtener progreso: ' . $e->getMessage(), 'success' => false]);
+                exit;
+            }
+        }
+        
         // GET /game/current
         if ($requestUri === '/game/current') {
             error_log("💾 Ruta de juego actual detectada: /game/current");

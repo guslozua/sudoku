@@ -1,8 +1,55 @@
-# Logs
-*.log
-error_log
+# ===================================
+# 🧹 GITIGNORE SUDOKU MINIMALISTA
+# ===================================
 
-# OS generated files
+# 🔒 Archivos sensibles
+.env
+.env.local
+.env.production
+.env.staging
+
+# 📝 Logs
+*.log
+logs/*.log
+storage/logs/*
+!storage/logs/.gitkeep
+error_log
+php_errors.log
+
+# 🗂️ Dependencias
+vendor/
+node_modules/
+composer.lock
+package-lock.json
+
+# 🛠️ Archivos de desarrollo
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# 💾 Archivos temporales
+*.tmp
+*.temp
+*.bak
+*.backup
+*.deleted
+temp_*
+
+# 🔧 Archivos de debug y testing
+debug_*
+test_*
+fix_*
+setup_*
+validate_*
+generate_*
+import_*
+stats_*
+verify_*
+verificacion_*
+
+# 🖥️ Sistema operativo
 .DS_Store
 .DS_Store?
 ._*
@@ -11,40 +58,31 @@ error_log
 ehthumbs.db
 Thumbs.db
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Temporary files
-*.tmp
-*.temp
-
-# Environment files
-.env
-.env.local
-.env.production
-
-# Dependencies
-vendor/
-node_modules/
-
-# Laravel specific (si usáramos Laravel completo)
-storage/logs/*
+# 🏗️ Laravel específico
 bootstrap/cache/*
+!bootstrap/cache/.gitkeep
+storage/app/*
+!storage/app/.gitkeep
+storage/framework/cache/*
+!storage/framework/cache/.gitkeep
+storage/framework/sessions/*
+!storage/framework/sessions/.gitkeep
+storage/framework/testing/*
+!storage/framework/testing/.gitkeep
+storage/framework/views/*
+!storage/framework/views/.gitkeep
 public/storage
 
-# Backup files
-*.bak
-*.backup
+# 📱 Build y distribución
+dist/
+build/
+public/hot
+public/mix-manifest.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Archivos temporales de debug
-temp_*
-test_*.php
-debug_*.php
-fix_*.php
-complete_fix_*.php
-setup_*.php
-update_*.php
-cleanup.sh
+# 🔄 Cache
+.phpunit.result.cache
+.php_cs.cache
+*.cache

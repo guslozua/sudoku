@@ -1,280 +1,4 @@
-    // 🎯 FUNCIÓN PARA VALIDAR QUE UN PUZZLE NO TENGA ERRORES
-    private function validatePuzzleBoard($puzzleString)
-    {
-        // Convertir string a array 2D
-        $board = [];
-        for ($i = 0; $i < 9; $i++) {
-            $row = [];
-            for ($j = 0; $j < 9; $j++) {
-                $row[] = intval($puzzleString[$i * 9 + $j]);
-            }
-    
-    // 📊 FUNCIONES DE ANALÍTICAS AVANZADAS
-    
-    // Calcular racha actual del usuario
-    private function calculateCurrentStreak($userId)
-    {
-        try {
-            $games = DB::select("
-                SELECT DATE(completed_at) as date, COUNT(*) as puzzles
-                FROM games 
-                WHERE user_id = ? AND status = 'completed'
-                    AND completed_at IS NOT NULL
-                GROUP BY DATE(completed_at)
-                ORDER BY DATE(completed_at) DESC
-            ", [$userId]);
-            
-            if (empty($games)) return 0;
-            
-            $streak = 0;
-            $today = new \DateTime();
-            $yesterday = new \DateTime('-1 day');
-            
-            foreach ($games as $game) {
-                $gameDate = new \DateTime($game->date);
-                
-                if ($streak == 0) {
-                    // Primer juego: debe ser hoy o ayer
-                    if ($gameDate->format('Y-m-d') == $today->format('Y-m-d') ||
-                        $gameDate->format('Y-m-d') == $yesterday->format('Y-m-d')) {
-                        $streak = 1;
-                        $lastDate = $gameDate;
-                    } else {
-                        break; // No hay racha actual
-                    }
-                } else {
-                    // Verificar si es consecutivo
-                    $expectedDate = clone $lastDate;
-                    $expectedDate->modify('-1 day');
-                    
-                    if ($gameDate->format('Y-m-d') == $expectedDate->format('Y-m-d')) {
-                        $streak++;
-                        $lastDate = $gameDate;
-                    } else {
-                        break; // Se rompe la racha
-                    }
-                }
-            }
-            
-            return $streak;
-        } catch (Exception $e) {
-            Log::error('Error calculando racha actual: ' . $e->getMessage());
-            return 0;
-        }
-    }
-    
-    // Calcular mejor racha del usuario
-    private function calculateBestStreak($userId)
-    {
-        try {
-            $games = DB::select("
-                SELECT DATE(completed_at) as date
-                FROM games 
-                WHERE user_id = ? AND status = 'completed'
-                    AND completed_at IS NOT NULL
-                GROUP BY DATE(completed_at)
-                ORDER BY DATE(completed_at) ASC
-            ", [$userId]);
-            
-            if (empty($games)) return 0;
-            
-            $bestStreak = 0;
-            $currentStreak = 1;
-            $lastDate = null;
-            
-            foreach ($games as $game) {
-                $gameDate = new \DateTime($game->date);
-                
-                if ($lastDate) {
-                    $expectedDate = clone $lastDate;
-                    $expectedDate->modify('+1 day');
-                    
-                    if ($gameDate->format('Y-m-d') == $expectedDate->format('Y-m-d')) {
-                        $currentStreak++;
-                    } else {
-                        $bestStreak = max($bestStreak, $currentStreak);
-                        $currentStreak = 1;
-                    }
-                }
-                
-                $lastDate = $gameDate;
-            }
-            
-            return max($bestStreak, $currentStreak);
-        } catch (Exception $e) {
-            Log::error('Error calculando mejor racha: ' . $e->getMessage());
-            return 0;
-        }
-    }
-    
-    // 🏆 SISTEMA DE LOGROS
-    
-    public function getAchievements(Request $request)
-    {
-        try {
-            $userId = $this->getUserId($request);
-            
-            // Obtener logros del usuario
-            $userAchievements = DB::select("
-                SELECT a.*, ua.unlocked_at, ua.is_completed
-                FROM achievements a
-                LEFT JOIN user_achievements ua ON a.id = ua.achievement_id AND ua.user_id = ?
-                ORDER BY a.category, a.id
-            ", [$userId]);
-            
-            return response()->json([
-                'success' => true,
-                'achievements' => $userAchievements
-            ]);
-            
-        } catch (Exception $e) {
-            Log::error('Error en getAchievements: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'error' => 'Error cargando logros'
-            ], 500);
-        }
-    }
-    
-    public function checkAchievements(Request $request)
-    {
-        try {
-            $userId = $this->getUserId($request);
-            
-            // Obtener estadísticas del usuario
-            $stats = $this->getUserStats($userId);
-            
-            $newAchievements = [];
-            
-            // Verificar logros de completado
-            $completionAchievements = [
-                ['games' => 1, 'name' => 'Primer Paso', 'description' => 'Completa tu primer puzzle'],
-                ['games' => 10, 'name' => 'Aficionado', 'description' => 'Completa 10 puzzles'],
-                ['games' => 50, 'name' => 'Experto', 'description' => 'Completa 50 puzzles'],
-                ['games' => 100, 'name' => 'Maestro', 'description' => 'Completa 100 puzzles']
-            ];
-            
-            foreach ($completionAchievements as $achievement) {
-                if ($stats->completed_games >= $achievement['games']) {
-                    $newAchievements[] = $this->unlockAchievement($userId, $achievement);
-                }
-            }
-            
-            // Verificar logros de velocidad
-            if ($stats->best_time && $stats->best_time <= 300) { // 5 minutos
-                $newAchievements[] = $this->unlockAchievement($userId, [
-                    'name' => 'Velocista',
-                    'description' => 'Completa un puzzle en menos de 5 minutos'
-                ]);
-            }
-            
-            return response()->json([
-                'success' => true,
-                'new_achievements' => array_filter($newAchievements)
-            ]);
-            
-        } catch (Exception $e) {
-            Log::error('Error en checkAchievements: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'error' => 'Error verificando logros'
-            ], 500);
-        }
-    }
-    
-    private function unlockAchievement($userId, $achievementData)
-    {
-        try {
-            // Verificar si ya está desbloqueado
-            $exists = DB::table('user_achievements')
-                ->where('user_id', $userId)
-                ->where('achievement_name', $achievementData['name'])
-                ->exists();
-            
-            if (!$exists) {
-                DB::table('user_achievements')->insert([
-                    'user_id' => $userId,
-                    'achievement_name' => $achievementData['name'],
-                    'achievement_description' => $achievementData['description'],
-                    'is_completed' => true,
-                    'unlocked_at' => now(),
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
-                
-                return $achievementData;
-            }
-            
-            return null;
-        } catch (Exception $e) {
-            Log::error('Error desbloqueando logro: ' . $e->getMessage());
-            return null;
-        }
-    }
-    
-    private function getUserStats($userId)
-    {
-        return DB::selectOne("
-            SELECT 
-                COUNT(*) as total_games,
-                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_games,
-                MIN(CASE WHEN status = 'completed' THEN completion_time END) as best_time,
-                AVG(CASE WHEN status = 'completed' THEN completion_time END) as avg_time
-            FROM games 
-            WHERE user_id = ?
-        ", [$userId]);
-    }
-}
-            $board[] = $row;
-        }
-        
-        // Verificar cada celda con número
-        for ($row = 0; $row < 9; $row++) {
-            for ($col = 0; $col < 9; $col++) {
-                $num = $board[$row][$col];
-                if ($num != 0) {
-                    if ($this->hasConflictInBoard($board, $row, $col, $num)) {
-                        return false; // Puzzle inválido
-                    }
-                }
-            }
-        }
-        
-        return true; // Puzzle válido
-    }
-    
-    // 🔍 DETECTAR CONFLICTOS EN UN TABLERO
-    private function hasConflictInBoard($board, $row, $col, $num)
-    {
-        // Verificar fila
-        for ($c = 0; $c < 9; $c++) {
-            if ($c != $col && $board[$row][$c] == $num) {
-                return true;
-            }
-        }
-        
-        // Verificar columna
-        for ($r = 0; $r < 9; $r++) {
-            if ($r != $row && $board[$r][$col] == $num) {
-                return true;
-            }
-        }
-        
-        // Verificar subcuadro 3x3
-        $startRow = floor($row / 3) * 3;
-        $startCol = floor($col / 3) * 3;
-        
-        for ($r = $startRow; $r < $startRow + 3; $r++) {
-            for ($c = $startCol; $c < $startCol + 3; $c++) {
-                if (($r != $row || $c != $col) && $board[$r][$c] == $num) {
-                    return true;
-                }
-            }
-        }
-        
-        return false;
-    }<?php
-
+<?php
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -304,19 +28,19 @@ class SudokuController extends Controller
                 return response()->json(['error' => 'Dificultad inválida'], 400);
             }
 
-            $maxAttempts = 10; // Máximo intentos para encontrar un puzzle válido
+            $maxAttempts = 10;
             $attempts = 0;
             $puzzle = null;
 
             do {
                 $attempts++;
                 
-                // Obtener puzzle aleatorio de la dificultad solicitada (solo los válidos)
+                // Obtener puzzle aleatorio de la dificultad solicitada
                 $candidatePuzzle = DB::table('puzzles')
                     ->where('difficulty_level', $difficulty)
                     ->where(function($query) {
                         $query->where('is_valid', true)
-                              ->orWhereNull('is_valid'); // Incluir puzzles sin validar aún
+                              ->orWhereNull('is_valid');
                     })
                     ->inRandomOrder()
                     ->first();
@@ -325,18 +49,15 @@ class SudokuController extends Controller
                     return response()->json(['error' => 'No hay puzzles disponibles'], 404);
                 }
                 
-                // 🛡️ VALIDAR QUE EL PUZZLE NO TENGA ERRORES
                 if ($this->validatePuzzleBoard($candidatePuzzle->puzzle_string)) {
                     $puzzle = $candidatePuzzle;
-                    break; // Puzzle válido encontrado
+                    break;
                 } else {
-                    // Log del puzzle inválido para debugging
                     error_log("Puzzle inválido detectado - ID: {$candidatePuzzle->id}, Intento: $attempts");
                 }
                 
             } while ($attempts < $maxAttempts);
             
-            // Si no encontramos un puzzle válido
             if (!$puzzle) {
                 return response()->json([
                     'error' => 'No se pudo generar un puzzle válido. Inténtalo de nuevo.',
@@ -371,10 +92,11 @@ class SudokuController extends Controller
                     'clues_count' => $puzzle->clues_count
                 ],
                 'game_id' => $gameId,
-                'validation_attempts' => $attempts // Para debugging
+                'validation_attempts' => $attempts
             ]);
 
         } catch (\Exception $e) {
+            error_log("Error in getNewPuzzle: " . $e->getMessage());
             return response()->json(['error' => 'Error interno del servidor'], 500);
         }
     }
@@ -476,33 +198,226 @@ class SudokuController extends Controller
     }
 
     /**
+     * Obtener logros del usuario
+     */
+    public function getAchievements(Request $request)
+    {
+        try {
+            $userId = $this->getUserId($request);
+            
+            // Obtener logros del usuario
+            $userAchievements = DB::select("
+                SELECT a.*, ua.unlocked_at, ua.is_completed
+                FROM achievements a
+                LEFT JOIN user_achievements ua ON a.id = ua.achievement_id AND ua.user_id = ?
+                ORDER BY a.category, a.id
+            ", [$userId]);
+            
+            return response()->json([
+                'success' => true,
+                'achievements' => $userAchievements
+            ]);
+            
+        } catch (\Exception $e) {
+            error_log('Error en getAchievements: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error cargando logros'
+            ], 500);
+        }
+    }
+
+    /**
+     * Verificar logros del usuario
+     */
+    public function checkAchievements(Request $request)
+    {
+        try {
+            $userId = $this->getUserId($request);
+            
+            // Obtener estadísticas del usuario
+            $stats = $this->getUserStats($userId);
+            
+            $newAchievements = [];
+            
+            // Verificar logros de completado
+            $completionAchievements = [
+                ['games' => 1, 'key' => 'first_step'],
+                ['games' => 10, 'key' => 'puzzle_master'],
+                ['games' => 50, 'key' => 'sudoku_legend']
+            ];
+            
+            foreach ($completionAchievements as $achievement) {
+                if ($stats->completed_games >= $achievement['games']) {
+                    $unlocked = $this->unlockAchievementByKey($userId, $achievement['key']);
+                    if ($unlocked) {
+                        $newAchievements[] = $unlocked;
+                    }
+                }
+            }
+            
+            // Verificar logros de velocidad
+            if ($stats->best_time && $stats->best_time <= 300) { // 5 minutos
+                $unlocked = $this->unlockAchievementByKey($userId, 'speed_demon');
+                if ($unlocked) {
+                    $newAchievements[] = $unlocked;
+                }
+            }
+            
+            if ($stats->best_time && $stats->best_time <= 180) { // 3 minutos
+                $unlocked = $this->unlockAchievementByKey($userId, 'lightning_fast');
+                if ($unlocked) {
+                    $newAchievements[] = $unlocked;
+                }
+            }
+            
+            return response()->json([
+                'success' => true,
+                'new_achievements' => $newAchievements
+            ]);
+            
+        } catch (\Exception $e) {
+            error_log('Error en checkAchievements: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error verificando logros'
+            ], 500);
+        }
+    }
+
+    // ==================== MÉTODOS PRIVADOS ====================
+
+    /**
      * Obtener o crear usuario de sesión anónimo
      */
     private function getOrCreateSessionUser()
     {
-        $sessionId = Session::get('sudoku_session_id');
+        // ✅ VERIFICAR SESIÓN DE FORMA SEGURA
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        $sessionId = $_SESSION['sudoku_session_id'] ?? null;
         
         if (!$sessionId) {
-            $sessionId = Str::uuid()->toString();
-            Session::put('sudoku_session_id', $sessionId);
+            $sessionId = 'sudoku_' . uniqid() . '.' . mt_rand();
+            $_SESSION['sudoku_session_id'] = $sessionId;
         }
 
-        $user = DB::table('users')->where('session_id', $sessionId)->first();
+        // ✅ USAR TRANSACCIÓN PARA EVITAR DUPLICADOS
+        DB::beginTransaction();
         
-        if (!$user) {
-            $userId = DB::table('users')->insertGetId([
-                'session_id' => $sessionId,
-                'is_anonymous' => true,
-                'is_premium' => false,
-                'preferred_difficulty' => 'medium',
-                'theme_preference' => 'auto',
-                'created_at' => now(),
-                'updated_at' => now()
-            ]);
-            return $userId;
-        }
+        try {
+            $user = DB::table('users')->where('session_id', $sessionId)->first();
+            
+            if (!$user) {
+                $userId = DB::table('users')->insertGetId([
+                    'session_id' => $sessionId,
+                    'is_anonymous' => true,
+                    'is_premium' => false,
+                    'preferred_difficulty' => 'medium',
+                    'theme_preference' => 'auto',
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
+                
+                DB::commit();
+                error_log("👤 Nuevo usuario creado: ID $userId, Session: $sessionId");
+                return $userId;
+            }
 
-        return $user->id;
+            DB::commit();
+            error_log("👤 Usuario existente: ID {$user->id}, Session: $sessionId");
+            return $user->id;
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            error_log("❌ Error creando usuario: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Obtener ID del usuario desde request
+     */
+    private function getUserId($request)
+    {
+        return $this->getOrCreateSessionUser();
+    }
+
+    /**
+     * Validar que un puzzle no tenga errores
+     */
+    private function validatePuzzleBoard($puzzleString)
+    {
+        // ✅ VALIDACIÓN RÁPIDA DE FORMATO
+        if (strlen($puzzleString) !== 81) {
+            error_log("❌ Puzzle inválido: longitud incorrecta (" . strlen($puzzleString) . " != 81)");
+            return false;
+        }
+        
+        // ✅ OPTIMIZACIÓN: Solo verificar números existentes
+        $board = [];
+        $occupiedCells = [];
+        
+        for ($i = 0; $i < 9; $i++) {
+            $row = [];
+            for ($j = 0; $j < 9; $j++) {
+                $value = intval($puzzleString[$i * 9 + $j]);
+                $row[] = $value;
+                
+                // ✅ SOLO PROCESAR CELDAS OCUPADAS
+                if ($value !== 0) {
+                    $occupiedCells[] = ['row' => $i, 'col' => $j, 'value' => $value];
+                }
+            }
+            $board[] = $row;
+        }
+        
+        // ✅ VERIFICAR SOLO CELDAS OCUPADAS (MÁS EFICIENTE)
+        foreach ($occupiedCells as $cell) {
+            if ($this->hasConflictInBoard($board, $cell['row'], $cell['col'], $cell['value'])) {
+                error_log("❌ Conflicto detectado en ({$cell['row']}, {$cell['col']}) con valor {$cell['value']}");
+                return false;
+            }
+        }
+        
+        error_log("✅ Puzzle válido: {" . count($occupiedCells) . "} celdas verificadas");
+        return true;
+    }
+
+    /**
+     * Detectar conflictos en un tablero
+     */
+    private function hasConflictInBoard($board, $row, $col, $num)
+    {
+        // Verificar fila
+        for ($c = 0; $c < 9; $c++) {
+            if ($c != $col && $board[$row][$c] == $num) {
+                return true;
+            }
+        }
+        
+        // Verificar columna
+        for ($r = 0; $r < 9; $r++) {
+            if ($r != $row && $board[$r][$col] == $num) {
+                return true;
+            }
+        }
+        
+        // Verificar subcuadro 3x3
+        $startRow = floor($row / 3) * 3;
+        $startCol = floor($col / 3) * 3;
+        
+        for ($r = $startRow; $r < $startRow + 3; $r++) {
+            for ($c = $startCol; $c < $startCol + 3; $c++) {
+                if (($r != $row || $c != $col) && $board[$r][$c] == $num) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     /**
@@ -616,688 +531,63 @@ class SudokuController extends Controller
         return true;
     }
 
-    // 📊 ENDPOINT DE DASHBOARD ANALYTICS
-    public function getDashboardAnalytics(Request $request)
-    {
-        try {
-            $userId = $this->getUserId($request);
-            
-            // Estadísticas generales del usuario
-            $userStats = DB::selectOne("
-                SELECT 
-                    COUNT(*) as total_games,
-                    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_games,
-                    AVG(CASE WHEN status = 'completed' THEN completion_time END) as avg_completion_time,
-                    MIN(CASE WHEN status = 'completed' THEN completion_time END) as best_time,
-                    SUM(CASE WHEN status = 'completed' THEN time_spent ELSE 0 END) as total_time_played,
-                    SUM(moves_count) as total_moves,
-                    SUM(hints_used) as total_hints,
-                    SUM(mistakes_count) as total_mistakes,
-                    COUNT(CASE WHEN perfect_game = 1 THEN 1 END) as perfect_games
-                FROM games 
-                WHERE user_id = ?
-            ", [$userId]);
-            
-            // Estadísticas por dificultad
-            $difficultyStats = DB::select("
-                SELECT 
-                    p.difficulty_level,
-                    COUNT(g.id) as count,
-                    AVG(g.completion_time) as avg_time,
-                    MIN(g.completion_time) as best_time
-                FROM games g
-                JOIN puzzles p ON g.puzzle_id = p.id
-                WHERE g.user_id = ? AND g.status = 'completed'
-                GROUP BY p.difficulty_level
-                ORDER BY 
-                    CASE p.difficulty_level 
-                        WHEN 'easy' THEN 1
-                        WHEN 'medium' THEN 2 
-                        WHEN 'hard' THEN 3
-                        WHEN 'expert' THEN 4
-                        WHEN 'master' THEN 5
-                    END
-            ", [$userId]);
-            
-            // Actividad reciente
-            $recentActivity = DB::select("
-                SELECT 
-                    p.difficulty_level,
-                    g.completion_time,
-                    g.moves_count,
-                    g.hints_used,
-                    g.mistakes_count,
-                    g.completed_at
-                FROM games g
-                JOIN puzzles p ON g.puzzle_id = p.id
-                WHERE g.user_id = ? AND g.status = 'completed'
-                ORDER BY g.completed_at DESC
-                LIMIT 10
-            ", [$userId]);
-            
-            // Progreso semanal
-            $weeklyProgress = DB::select("
-                SELECT 
-                    DATE(g.completed_at) as date,
-                    COUNT(*) as puzzles_completed,
-                    AVG(g.completion_time) as avg_time,
-                    MIN(g.completion_time) as best_time
-                FROM games g
-                WHERE g.user_id = ? AND g.status = 'completed'
-                    AND g.completed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                GROUP BY DATE(g.completed_at)
-                ORDER BY date DESC
-            ", [$userId]);
-            
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'user_stats' => $userStats,
-                    'difficulty_stats' => $difficultyStats,
-                    'recent_activity' => $recentActivity,
-                    'weekly_progress' => $weeklyProgress
-                ]
-            ]);
-            
-        } catch (Exception $e) {
-            Log::error('Error in getDashboardAnalytics: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'error' => 'Error cargando analíticas: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-    
-    // 📈 ENDPOINT DE PROGRESS ANALYTICS
-    public function getProgressAnalytics(Request $request)
-    {
-        try {
-            $userId = $this->getUserId($request);
-            $days = $request->get('days', 30);
-            
-            // Totales diarios
-            $dailyTotals = DB::select("
-                SELECT 
-                    DATE(g.completed_at) as date,
-                    COUNT(*) as total_puzzles,
-                    AVG(g.completion_time) as avg_time,
-                    MIN(g.completion_time) as best_time,
-                    SUM(g.time_spent) as total_time_spent,
-                    COUNT(CASE WHEN g.perfect_game = 1 THEN 1 END) as perfect_games
-                FROM games g
-                WHERE g.user_id = ? AND g.status = 'completed'
-                    AND g.completed_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-                GROUP BY DATE(g.completed_at)
-                ORDER BY date ASC
-            ", [$userId, $days]);
-            
-            // Calcular rachas
-            $currentStreak = $this->calculateCurrentStreak($userId);
-            $bestStreak = $this->calculateBestStreak($userId);
-            
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'daily_totals' => $dailyTotals,
-                    'current_streak' => $currentStreak,
-                    'best_streak' => $bestStreak,
-                    'period_days' => $days
-                ]
-            ]);
-            
-        } catch (Exception $e) {
-            Log::error('Error in getProgressAnalytics: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'error' => 'Error cargando progreso: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-    
-    // 📊 FUNCIONES DE ANALÍTICAS AVANZADAS
-    
     /**
-     * Obtener datos del dashboard analítico
+     * Desbloquear logro por clave
      */
-    public function getDashboardAnalytics($userId)
-    {
-        error_log("📊 Obteniendo analytics del dashboard para usuario: $userId");
-        
-        try {
-            // Estadísticas generales del usuario
-            $stmt = $this->pdo->prepare("
-                SELECT 
-                    total_games,
-                    completed_games,
-                    ROUND(avg_completion_time, 2) as avg_completion_time,
-                    best_time,
-                    total_time_played,
-                    total_moves,
-                    total_hints,
-                    total_mistakes,
-                    easy_completed,
-                    medium_completed,
-                    hard_completed,
-                    expert_completed,
-                    master_completed,
-                    perfect_games
-                FROM user_statistics 
-                WHERE user_id = ?
-            ");
-            $stmt->execute([$userId]);
-            $userStats = $stmt->fetch() ?: [];
-            
-            // Estadísticas de los últimos 7 días
-            $stmt = $this->pdo->prepare("
-                SELECT 
-                    DATE(completed_at) as date,
-                    COUNT(*) as puzzles_completed,
-                    AVG(completion_time) as avg_time,
-                    MIN(completion_time) as best_time
-                FROM games 
-                WHERE user_id = ? 
-                    AND status = 'completed' 
-                    AND completed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                GROUP BY DATE(completed_at)
-                ORDER BY date DESC
-            ");
-            $stmt->execute([$userId]);
-            $weeklyProgress = $stmt->fetchAll();
-            
-            // Distribución por dificultad (últimos 30 días)
-            $stmt = $this->pdo->prepare("
-                SELECT 
-                    difficulty_level,
-                    COUNT(*) as count,
-                    AVG(completion_time) as avg_time,
-                    MIN(completion_time) as best_time
-                FROM games 
-                WHERE user_id = ? 
-                    AND status = 'completed' 
-                    AND completed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                GROUP BY difficulty_level
-            ");
-            $stmt->execute([$userId]);
-            $difficultyStats = $stmt->fetchAll();
-            
-            // Progreso de logros
-            $stmt = $this->pdo->prepare("
-                SELECT 
-                    achievement_type,
-                    COUNT(*) as unlocked_count
-                FROM user_achievements 
-                WHERE user_id = ?
-                GROUP BY achievement_type
-            ");
-            $stmt->execute([$userId]);
-            $achievementProgress = $stmt->fetchAll();
-            
-            // Actividad reciente (últimos 5 juegos)
-            $stmt = $this->pdo->prepare("
-                SELECT 
-                    difficulty_level,
-                    completion_time,
-                    moves_count,
-                    hints_used,
-                    mistakes_count,
-                    completed_at
-                FROM games 
-                WHERE user_id = ? AND status = 'completed'
-                ORDER BY completed_at DESC 
-                LIMIT 5
-            ");
-            $stmt->execute([$userId]);
-            $recentActivity = $stmt->fetchAll();
-            
-            // Tendencias (comparar esta semana vs semana anterior)
-            $stmt = $this->pdo->prepare("
-                SELECT 
-                    'this_week' as period,
-                    COUNT(*) as puzzles,
-                    AVG(completion_time) as avg_time,
-                    SUM(time_spent) as total_time
-                FROM games 
-                WHERE user_id = ? 
-                    AND status = 'completed'
-                    AND completed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                UNION ALL
-                SELECT 
-                    'last_week' as period,
-                    COUNT(*) as puzzles,
-                    AVG(completion_time) as avg_time,
-                    SUM(time_spent) as total_time
-                FROM games 
-                WHERE user_id = ? 
-                    AND status = 'completed'
-                    AND completed_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
-                    AND completed_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
-            ");
-            $stmt->execute([$userId, $userId]);
-            $trends = $stmt->fetchAll();
-            
-            $dashboardData = [
-                'user_stats' => $userStats,
-                'weekly_progress' => $weeklyProgress,
-                'difficulty_stats' => $difficultyStats,
-                'achievement_progress' => $achievementProgress,
-                'recent_activity' => $recentActivity,
-                'trends' => $trends,
-                'generated_at' => date('Y-m-d H:i:s')
-            ];
-            
-            error_log("✅ Dashboard analytics generado exitosamente");
-            return $dashboardData;
-            
-        } catch (Exception $e) {
-            error_log("❌ Error generando dashboard analytics: " . $e->getMessage());
-            throw $e;
-        }
-    }
-    
-    /**
-     * Obtener datos de progreso temporal
-     */
-    public function getProgressAnalytics($userId, $days = 30)
-    {
-        error_log("📈 Obteniendo analytics de progreso para usuario: $userId (últimos $days días)");
-        
-        try {
-            // Progreso diario detallado
-            $stmt = $this->pdo->prepare("
-                SELECT 
-                    DATE(completed_at) as date,
-                    difficulty_level,
-                    COUNT(*) as puzzles_completed,
-                    AVG(completion_time) as avg_completion_time,
-                    MIN(completion_time) as best_time,
-                    SUM(moves_count) as total_moves,
-                    AVG(moves_count) as avg_moves,
-                    SUM(hints_used) as total_hints,
-                    SUM(mistakes_count) as total_mistakes,
-                    COUNT(CASE WHEN perfect_game = TRUE THEN 1 END) as perfect_games
-                FROM games 
-                WHERE user_id = ? 
-                    AND status = 'completed'
-                    AND completed_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-                GROUP BY DATE(completed_at), difficulty_level
-                ORDER BY date DESC, difficulty_level
-            ");
-            $stmt->execute([$userId, $days]);
-            $dailyProgress = $stmt->fetchAll();
-            
-            // Agregado por día (suma de todas las dificultades)
-            $stmt = $this->pdo->prepare("
-                SELECT 
-                    DATE(completed_at) as date,
-                    COUNT(*) as total_puzzles,
-                    AVG(completion_time) as avg_time,
-                    MIN(completion_time) as best_time,
-                    SUM(time_spent) as total_time_spent,
-                    AVG(moves_count) as avg_moves,
-                    SUM(hints_used) as hints_used,
-                    COUNT(CASE WHEN perfect_game = TRUE THEN 1 END) as perfect_games
-                FROM games 
-                WHERE user_id = ? 
-                    AND status = 'completed'
-                    AND completed_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-                GROUP BY DATE(completed_at)
-                ORDER BY date DESC
-            ");
-            $stmt->execute([$userId, $days]);
-            $dailyTotals = $stmt->fetchAll();
-            
-            // Heatmap de actividad (hora del día)
-            $stmt = $this->pdo->prepare("
-                SELECT 
-                    HOUR(completed_at) as hour_of_day,
-                    COUNT(*) as puzzles_count,
-                    AVG(completion_time) as avg_performance
-                FROM games 
-                WHERE user_id = ? 
-                    AND status = 'completed'
-                    AND completed_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-                GROUP BY HOUR(completed_at)
-                ORDER BY hour_of_day
-            ");
-            $stmt->execute([$userId, $days]);
-            $hourlyActivity = $stmt->fetchAll();
-            
-            // Progreso por dificultad a lo largo del tiempo
-            $stmt = $this->pdo->prepare("
-                SELECT 
-                    DATE(completed_at) as date,
-                    difficulty_level,
-                    AVG(completion_time) as avg_time,
-                    COUNT(*) as count
-                FROM games 
-                WHERE user_id = ? 
-                    AND status = 'completed'
-                    AND completed_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-                GROUP BY DATE(completed_at), difficulty_level
-                ORDER BY date ASC
-            ");
-            $stmt->execute([$userId, $days]);
-            $difficultyTrends = $stmt->fetchAll();
-            
-            // Racha actual y mejor racha
-            $stmt = $this->pdo->prepare("
-                SELECT 
-                    completed_at,
-                    DATE(completed_at) as completion_date
-                FROM games 
-                WHERE user_id = ? AND status = 'completed'
-                ORDER BY completed_at DESC
-                LIMIT 50
-            ");
-            $stmt->execute([$userId]);
-            $recentCompletions = $stmt->fetchAll();
-            
-            // Calcular rachas
-            $currentStreak = $this->calculateCurrentStreak($recentCompletions);
-            $bestStreak = $this->calculateBestStreak($userId, $days);
-            
-            $progressData = [
-                'daily_progress' => $dailyProgress,
-                'daily_totals' => $dailyTotals,
-                'hourly_activity' => $hourlyActivity,
-                'difficulty_trends' => $difficultyTrends,
-                'current_streak' => $currentStreak,
-                'best_streak' => $bestStreak,
-                'period_days' => $days,
-                'generated_at' => date('Y-m-d H:i:s')
-            ];
-            
-            error_log("✅ Progress analytics generado exitosamente");
-            return $progressData;
-            
-        } catch (Exception $e) {
-            error_log("❌ Error generando progress analytics: " . $e->getMessage());
-            throw $e;
-        }
-    }
-    
-    /**
-     * Calcular racha actual de días consecutivos
-     */
-    private function calculateCurrentStreak($recentCompletions)
-    {
-        if (empty($recentCompletions)) {
-            return 0;
-        }
-        
-        $today = date('Y-m-d');
-        $yesterday = date('Y-m-d', strtotime('-1 day'));
-        $streak = 0;
-        
-        // Agrupar por fecha
-        $dateGroups = [];
-        foreach ($recentCompletions as $completion) {
-            $date = $completion['completion_date'];
-            if (!isset($dateGroups[$date])) {
-                $dateGroups[$date] = 0;
-            }
-            $dateGroups[$date]++;
-        }
-        
-        // Verificar si hay actividad hoy o ayer para iniciar la racha
-        $hasActivityToday = isset($dateGroups[$today]);
-        $hasActivityYesterday = isset($dateGroups[$yesterday]);
-        
-        if (!$hasActivityToday && !$hasActivityYesterday) {
-            return 0;
-        }
-        
-        // Comenzar desde hoy si hay actividad, si no desde ayer
-        $startDate = $hasActivityToday ? $today : $yesterday;
-        
-        // Contar días consecutivos hacia atrás
-        $currentDate = $startDate;
-        while (isset($dateGroups[$currentDate])) {
-            $streak++;
-            $currentDate = date('Y-m-d', strtotime($currentDate . ' -1 day'));
-        }
-        
-        return $streak;
-    }
-    
-    /**
-     * Calcular la mejor racha en el período
-     */
-    private function calculateBestStreak($userId, $days)
+    private function unlockAchievementByKey($userId, $achievementKey)
     {
         try {
-            $stmt = $this->pdo->prepare("
-                SELECT DATE(completed_at) as completion_date
-                FROM games 
-                WHERE user_id = ? 
-                    AND status = 'completed'
-                    AND completed_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-                GROUP BY DATE(completed_at)
-                ORDER BY completion_date ASC
-            ");
-            $stmt->execute([$userId, $days]);
-            $dates = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            // Obtener el logro por su clave
+            $achievement = DB::table('achievements')->where('key_name', $achievementKey)->first();
             
-            if (empty($dates)) {
-                return 0;
+            if (!$achievement) {
+                return null;
             }
             
-            $maxStreak = 0;
-            $currentStreak = 1;
+            // Verificar si ya está desbloqueado
+            $exists = DB::table('user_achievements')
+                ->where('user_id', $userId)
+                ->where('achievement_id', $achievement->id)
+                ->exists();
             
-            for ($i = 1; $i < count($dates); $i++) {
-                $prevDate = new DateTime($dates[$i-1]);
-                $currDate = new DateTime($dates[$i]);
-                $daysDiff = $currDate->diff($prevDate)->days;
-                
-                if ($daysDiff === 1) {
-                    $currentStreak++;
-                } else {
-                    $maxStreak = max($maxStreak, $currentStreak);
-                    $currentStreak = 1;
-                }
-            }
-            
-            return max($maxStreak, $currentStreak);
-            
-        } catch (Exception $e) {
-            error_log("❌ Error calculando mejor racha: " . $e->getMessage());
-            return 0;
-        }
-    }
-    
-    /**
-     * Registrar métricas de rendimiento
-     */
-    public function recordPerformanceMetric($userId, $metricType, $value, $difficulty = null, $metadata = null)
-    {
-        try {
-            $stmt = $this->pdo->prepare("
-                INSERT INTO performance_metrics 
-                (user_id, metric_type, metric_value, difficulty_level, metadata) 
-                VALUES (?, ?, ?, ?, ?)
-            ");
-            
-            $metadataJson = $metadata ? json_encode($metadata) : null;
-            $stmt->execute([$userId, $metricType, $value, $difficulty, $metadataJson]);
-            
-            error_log("📊 Métrica registrada: $metricType = $value para usuario $userId");
-        } catch (Exception $e) {
-            error_log("❌ Error registrando métrica: " . $e->getMessage());
-        }
-    }
-    
-    /**
-     * Actualizar estadísticas diarias
-     */
-    public function updateDailyStats($userId, $gameData)
-    {
-        try {
-            $today = date('Y-m-d');
-            
-            // Obtener estadísticas actuales del día
-            $stmt = $this->pdo->prepare("
-                SELECT * FROM daily_stats 
-                WHERE user_id = ? AND date = ?
-            ");
-            $stmt->execute([$userId, $today]);
-            $dailyStats = $stmt->fetch();
-            
-            $difficultyColumn = $gameData['difficulty_level'] . '_completed';
-            
-            if ($dailyStats) {
-                // Actualizar estadísticas existentes
-                $stmt = $this->pdo->prepare("
-                    UPDATE daily_stats SET 
-                        puzzles_completed = puzzles_completed + 1,
-                        total_time_spent = total_time_spent + ?,
-                        total_moves = total_moves + ?,
-                        total_hints_used = total_hints_used + ?,
-                        total_mistakes = total_mistakes + ?,
-                        average_completion_time = (total_time_spent + ?) / (puzzles_completed + 1),
-                        best_completion_time = CASE 
-                            WHEN best_completion_time IS NULL OR ? < best_completion_time 
-                            THEN ? ELSE best_completion_time END,
-                        $difficultyColumn = $difficultyColumn + 1,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE user_id = ? AND date = ?
-                ");
-                
-                $stmt->execute([
-                    $gameData['completion_time'],
-                    $gameData['moves_count'],
-                    $gameData['hints_used'],
-                    $gameData['mistakes_count'],
-                    $gameData['completion_time'],
-                    $gameData['completion_time'],
-                    $gameData['completion_time'],
-                    $userId,
-                    $today
+            if (!$exists) {
+                DB::table('user_achievements')->insert([
+                    'user_id' => $userId,
+                    'achievement_id' => $achievement->id,
+                    'is_completed' => true,
+                    'unlocked_at' => now(),
+                    'current_progress' => $achievement->target_value
                 ]);
-            } else {
-                // Crear nuevas estadísticas diarias
-                $stmt = $this->pdo->prepare("
-                    INSERT INTO daily_stats (
-                        user_id, date, puzzles_completed, total_time_spent, 
-                        total_moves, total_hints_used, total_mistakes,
-                        average_completion_time, best_completion_time,
-                        $difficultyColumn
-                    ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, 1)
-                ");
                 
-                $stmt->execute([
-                    $userId,
-                    $today,
-                    $gameData['completion_time'],
-                    $gameData['moves_count'],
-                    $gameData['hints_used'],
-                    $gameData['mistakes_count'],
-                    $gameData['completion_time'],
-                    $gameData['completion_time']
-                ]);
+                return [
+                    'id' => $achievement->id,
+                    'name' => $achievement->name,
+                    'description' => $achievement->description,
+                    'icon' => $achievement->icon,
+                    'category' => $achievement->category
+                ];
             }
             
-            error_log("📊 Estadísticas diarias actualizadas para usuario $userId");
-        } catch (Exception $e) {
-            error_log("❌ Error actualizando estadísticas diarias: " . $e->getMessage());
+            return null;
+        } catch (\Exception $e) {
+            error_log('Error desbloqueando logro: ' . $e->getMessage());
+            return null;
         }
     }
-    
-    // 📊 FUNCIONES DE ANALÍTICAS AVANZADAS
-    
-    // Calcular racha actual del usuario
-    private function calculateCurrentStreak($userId)
+
+    /**
+     * Obtener estadísticas del usuario
+     */
+    private function getUserStats($userId)
     {
-        try {
-            $games = DB::select("
-                SELECT DATE(completed_at) as date, COUNT(*) as puzzles
-                FROM games 
-                WHERE user_id = ? AND status = 'completed'
-                    AND completed_at IS NOT NULL
-                GROUP BY DATE(completed_at)
-                ORDER BY DATE(completed_at) DESC
-            ", [$userId]);
-            
-            if (empty($games)) return 0;
-            
-            $streak = 0;
-            $today = new \DateTime();
-            $yesterday = new \DateTime('-1 day');
-            
-            foreach ($games as $game) {
-                $gameDate = new \DateTime($game->date);
-                
-                if ($streak == 0) {
-                    // Primer juego: debe ser hoy o ayer
-                    if ($gameDate->format('Y-m-d') == $today->format('Y-m-d') ||
-                        $gameDate->format('Y-m-d') == $yesterday->format('Y-m-d')) {
-                        $streak = 1;
-                        $lastDate = $gameDate;
-                    } else {
-                        break; // No hay racha actual
-                    }
-                } else {
-                    // Verificar si es consecutivo
-                    $expectedDate = clone $lastDate;
-                    $expectedDate->modify('-1 day');
-                    
-                    if ($gameDate->format('Y-m-d') == $expectedDate->format('Y-m-d')) {
-                        $streak++;
-                        $lastDate = $gameDate;
-                    } else {
-                        break; // Se rompe la racha
-                    }
-                }
-            }
-            
-            return $streak;
-        } catch (Exception $e) {
-            error_log('Error calculando racha actual: ' . $e->getMessage());
-            return 0;
-        }
-    }
-    
-    // Calcular mejor racha del usuario
-    private function calculateBestStreak($userId)
-    {
-        try {
-            $games = DB::select("
-                SELECT DATE(completed_at) as date
-                FROM games 
-                WHERE user_id = ? AND status = 'completed'
-                    AND completed_at IS NOT NULL
-                GROUP BY DATE(completed_at)
-                ORDER BY DATE(completed_at) ASC
-            ", [$userId]);
-            
-            if (empty($games)) return 0;
-            
-            $bestStreak = 0;
-            $currentStreak = 1;
-            $lastDate = null;
-            
-            foreach ($games as $game) {
-                $gameDate = new \DateTime($game->date);
-                
-                if ($lastDate) {
-                    $expectedDate = clone $lastDate;
-                    $expectedDate->modify('+1 day');
-                    
-                    if ($gameDate->format('Y-m-d') == $expectedDate->format('Y-m-d')) {
-                        $currentStreak++;
-                    } else {
-                        $bestStreak = max($bestStreak, $currentStreak);
-                        $currentStreak = 1;
-                    }
-                }
-                
-                $lastDate = $gameDate;
-            }
-            
-            return max($bestStreak, $currentStreak);
-        } catch (Exception $e) {
-            error_log('Error calculando mejor racha: ' . $e->getMessage());
-            return 0;
-        }
+        return DB::selectOne("
+            SELECT 
+                COUNT(*) as total_games,
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_games,
+                MIN(CASE WHEN status = 'completed' THEN completion_time END) as best_time,
+                AVG(CASE WHEN status = 'completed' THEN completion_time END) as avg_time
+            FROM games 
+            WHERE user_id = ?
+        ", [$userId]);
     }
 }

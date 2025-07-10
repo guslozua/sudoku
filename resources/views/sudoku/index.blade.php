@@ -4,7 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Sudoku Minimalista</title>
+    
+    <!-- 🎨 SEO Y METADATOS -->
+    <title>Sudoku Minimalista - Juego de Lógica Online</title>
+    <meta name="description" content="Juega Sudoku online gratis. 5 niveles de dificultad, sistema de logros, analíticas y auto-guardado. La mejor experiencia de Sudoku en tu navegador.">
+    <meta name="keywords" content="sudoku, puzzle, juego, lógica, online, gratis, minimalista">
+    <meta name="author" content="Sudoku Minimalista">
+    
+    <!-- 🎨 FAVICONS OPTIMIZADOS -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/Sudoku/public/assets/favicons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/Sudoku/public/assets/favicons/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/Sudoku/public/assets/favicons/apple-touch-icon.png">
+    <link rel="shortcut icon" href="/Sudoku/public/assets/favicons/favicon-32x32.png">
+    
+    <!-- 🎨 THEME Y PWA -->
+    <meta name="theme-color" content="#4F46E5">
+    <meta name="msapplication-TileColor" content="#4F46E5">
+    <meta name="application-name" content="Sudoku Minimalista">
+    
+    <!-- 📱 MOBILE OPTIMIZADO -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Sudoku">
+    
+    <!-- 🔗 OPEN GRAPH (REDES SOCIALES) -->
+    <meta property="og:title" content="Sudoku Minimalista - Juego de Lógica Online">
+    <meta property="og:description" content="El mejor juego de Sudoku online con sistema de logros, analíticas y 5 niveles de dificultad.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ url('/') }}">
+    <meta property="og:image" content="/Sudoku/public/assets/favicons/android-chrome-512x512.png">
+    
+    <!-- 🐦 TWITTER CARD -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Sudoku Minimalista">
+    <meta name="twitter:description" content="Juega Sudoku online gratis con la mejor experiencia de usuario.">
+    <meta name="twitter:image" content="/Sudoku/public/assets/favicons/android-chrome-192x192.png">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -125,6 +160,26 @@
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
+        }
+        
+        /* 🎨 ESTILOS PARA EL LOGO */
+        .sudoku-logo {
+            height: 32px;
+            width: auto;
+            transition: all 0.3s ease;
+            object-fit: contain;
+        }
+        
+        .sudoku-logo:hover {
+            transform: scale(1.05);
+        }
+        
+        .sudoku-logo.dark-mode {
+            filter: brightness(1.2) contrast(1.1);
+        }
+        
+        .sudoku-logo.light-mode {
+            filter: brightness(0.9) contrast(1.05);
         }
     </style>
 </head>
@@ -1865,6 +1920,9 @@
                     )}
                     
                     {/* 📊 MODAL DE ANALÍTICAS AVANZADAS */}
+                    
+                    {/* 🎨 COMPONENT: LOGO DINÁMICO */}
+                    {/* Este componente reemplaza el texto "Sudoku" en el header */}
                     {showAnalytics && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                             <div className={`rounded-lg shadow-xl max-w-6xl w-full max-h-[95vh] overflow-hidden ${
@@ -2314,7 +2372,28 @@
                         <div className="max-w-6xl mx-auto px-4 py-4">
                             <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-4">
-                                    <h1 className="text-2xl font-bold">Sudoku</h1>
+                                    <div className="flex items-center">
+                                    <img 
+                                        src={isDarkMode 
+                                            ? '/Sudoku/public/assets/images/logo-sudo2-black-transparente.png'
+                                            : '/Sudoku/public/assets/images/logo-sudo2-transparente.png'
+                                        }
+                                        alt="Sudoku Minimalista" 
+                                        className={`sudoku-logo ${isDarkMode ? 'dark-mode' : 'light-mode'}`}
+                                        onError={(e) => {
+                                            console.log('🎨 Logo no encontrado, usando texto de fallback');
+                                            console.log('🔍 Intentaba cargar:', e.target.src);
+                                            e.target.style.display = 'none';
+                                            e.target.nextSibling.style.display = 'block';
+                                        }}
+                                    />
+    <span 
+        style={{display: 'none'}} 
+        className={isDarkMode ? 'text-2xl font-bold text-white' : 'text-2xl font-bold text-gray-900'}
+    >
+        Sudoku Minimalista
+    </span>
+</div>
                                     <div className="flex items-center gap-2 text-sm">
                                         <span className={`px-2 py-1 rounded-md ${
                                             isDarkMode ? 'bg-gray-700' : 'bg-gray-100'

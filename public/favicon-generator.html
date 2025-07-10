@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎨 Generador de Favicons - Sudoku</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .step {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 15px;
+            border-left: 4px solid #4ade80;
+        }
+        
+        .step h3 {
+            margin-top: 0;
+            color: #4ade80;
+            font-size: 1.3em;
+        }
+        
+        .canvas-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .canvas-item {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        
+        canvas {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: white;
+        }
+        
+        .size-label {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #e5e7eb;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #4ade80, #10b981);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(74, 222, 128, 0.3);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(74, 222, 128, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .preview-img {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 10px;
+            margin: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .download-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .download-link {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-decoration: none;
+            color: white;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .download-link:hover {
+            background: rgba(74, 222, 128, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            border-left: 4px solid #fbbf24;
+        }
+        
+        .success {
+            background: rgba(74, 222, 128, 0.2);
+            border: 1px solid #4ade80;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Generador de Favicons - Sudoku Minimalista</h1>
+        
+        <div class="step">
+            <h3>📤 Paso 1: Cargar tu Logo</h3>
+            <div style="text-align: center; margin: 20px 0;">
+                <button class="btn" onclick="loadExistingLogo()">
+                    📁 Cargar logo-source.png automáticamente
+                </button>
+            </div>
+            
+            <div id="preview" style="text-align: center; margin: 20px 0;"></div>
+        </div>
+        
+        <div class="step">
+            <h3>🔧 Paso 2: Generar Favicons</h3>
+            <p>Se generarán automáticamente todos los tamaños necesarios:</p>
+            
+            <div class="canvas-container" id="canvasContainer">
+                <!-- Los canvas se generarán aquí -->
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <button class="btn" onclick="generateFavicons()" id="generateBtn" disabled>
+                    🚀 Generar Todos los Favicons
+                </button>
+            </div>
+        </div>
+        
+        <div class="step" id="downloadStep" style="display: none;">
+            <h3>💾 Paso 3: Descargar Favicons</h3>
+            <div class="download-links" id="downloadLinks">
+                <!-- Los enlaces se generarán aquí -->
+            </div>
+        </div>
+        
+        <div class="step" id="codeStep" style="display: none;">
+            <h3>📝 Paso 4: Código HTML Generado</h3>
+            <p>Este código se implementará automáticamente en tu proyecto:</p>
+            <div class="code-block" id="htmlCode">
+                <!-- El código se generará aquí -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let loadedImage = null;
+        const sizes = [
+            {name: 'favicon-16x16', size: 16, desc: 'Favicon básico'},
+            {name: 'favicon-32x32', size: 32, desc: 'Favicon estándar'},
+            {name: 'apple-touch-icon', size: 180, desc: 'iOS/Safari'},
+            {name: 'android-chrome-192x192', size: 192, desc: 'Android Chrome'},
+            {name: 'android-chrome-512x512', size: 512, desc: 'Android PWA'}
+        ];
+        
+        // Cargar logo existente automáticamente
+        function loadExistingLogo() {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = function() {
+                loadedImage = img;
+                showPreview(img);
+                setupCanvases();
+                document.getElementById('generateBtn').disabled = false;
+            };
+            img.onerror = function() {
+                alert('No se pudo cargar el logo. Asegúrate de que logo-source.png esté en /assets/favicons/');
+            };
+            img.src = '/Sudoku/public/assets/favicons/logo-source.png';
+        }
+        
+        function showPreview(img) {
+            const preview = document.getElementById('preview');
+            preview.innerHTML = '';
+            
+            const previewImg = img.cloneNode();
+            previewImg.className = 'preview-img';
+            preview.appendChild(previewImg);
+            
+            const info = document.createElement('p');
+            info.innerHTML = `📏 Imagen cargada: ${img.width}x${img.height}px`;
+            preview.appendChild(info);
+            
+            const success = document.createElement('div');
+            success.className = 'success';
+            success.innerHTML = '✅ ¡Imagen cargada correctamente! Ahora puedes generar los favicons.';
+            preview.appendChild(success);
+        }
+        
+        function setupCanvases() {
+            const container = document.getElementById('canvasContainer');
+            container.innerHTML = '';
+            
+            sizes.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'canvas-item';
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = item.size;
+                canvas.height = item.size;
+                canvas.id = `canvas-${item.size}`;
+                
+                const label = document.createElement('div');
+                label.className = 'size-label';
+                label.innerHTML = `${item.size}x${item.size}<br>${item.desc}`;
+                
+                div.appendChild(canvas);
+                div.appendChild(label);
+                container.appendChild(div);
+            });
+        }
+        
+        function generateFavicons() {
+            if (!loadedImage) {
+                alert('Por favor, carga una imagen primero');
+                return;
+            }
+            
+            const downloadLinks = [];
+            
+            sizes.forEach(item => {
+                const canvas = document.getElementById(`canvas-${item.size}`);
+                const ctx = canvas.getContext('2d');
+                
+                // Limpiar canvas
+                ctx.clearRect(0, 0, item.size, item.size);
+                
+                // Configurar para mejor calidad
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                
+                // Dibujar imagen centrada y escalada proporcionalmente
+                const scale = Math.min(item.size / loadedImage.width, item.size / loadedImage.height);
+                const drawWidth = loadedImage.width * scale;
+                const drawHeight = loadedImage.height * scale;
+                const offsetX = (item.size - drawWidth) / 2;
+                const offsetY = (item.size - drawHeight) / 2;
+                
+                ctx.drawImage(loadedImage, offsetX, offsetY, drawWidth, drawHeight);
+                
+                // Crear enlace de descarga
+                canvas.toBlob(blob => {
+                    const url = URL.createObjectURL(blob);
+                    downloadLinks.push({
+                        url: url,
+                        filename: `${item.name}.png`,
+                        desc: item.desc,
+                        size: item.size
+                    });
+                    
+                    if (downloadLinks.length === sizes.length) {
+                        showDownloadLinks(downloadLinks);
+                        generateHTMLCode();
+                    }
+                }, 'image/png');
+            });
+        }
+        
+        function showDownloadLinks(links) {
+            const container = document.getElementById('downloadLinks');
+            container.innerHTML = '';
+            
+            links.forEach(link => {
+                const a = document.createElement('a');
+                a.href = link.url;
+                a.download = link.filename;
+                a.className = 'download-link';
+                a.innerHTML = `
+                    <strong>📱 ${link.filename}</strong><br>
+                    ${link.size}x${link.size} - ${link.desc}
+                `;
+                container.appendChild(a);
+            });
+            
+            document.getElementById('downloadStep').style.display = 'block';
+        }
+        
+        function generateHTMLCode() {
+            const code = `<!-- 🎯 Favicons Sudoku Minimalista -->
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicons/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicons/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/favicons/apple-touch-icon.png">
+<link rel="shortcut icon" href="/assets/favicons/favicon-32x32.png">
+<meta name="theme-color" content="#4F46E5">
+<meta name="msapplication-TileColor" content="#4F46E5">`;
+            
+            document.getElementById('htmlCode').textContent = code;
+            document.getElementById('codeStep').style.display = 'block';
+        }
+        
+        // Auto-cargar al abrir la página
+        window.onload = function() {
+            setTimeout(loadExistingLogo, 1000);
+        };
+    </script>
+</body>
+</html>

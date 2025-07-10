@@ -1,0 +1,234 @@
+{
+  "header": {
+    "title": "Sudoku Minimalista",
+    "new": "Nuevo",
+    "difficulty": {
+      "easy": "Fácil",
+      "medium": "Medio",
+      "hard": "Difícil",
+      "expert": "Experto",
+      "master": "Maestro"
+    },
+    "achievements": "Logros",
+    "analytics": "Analytics",
+    "test_api": "Test API"
+  },
+  "game": {
+    "loading": "Cargando puzzle...",
+    "completed": "¡Puzzle Completado!",
+    "time": "Tiempo",
+    "movements": "Movimientos",
+    "hints": "Pistas",
+    "progress": "Progreso",
+    "erase": "Borrar",
+    "hint": "Pista",
+    "save": "Guardar ahora",
+    "save_now": "💾 Guardar ahora",
+    "saving": "💾 Guardando...",
+    "saved": "✅ Guardado",
+    "retry": "❌ Reintentar",
+    "numbers": "Números",
+    "available": "Disponibles",
+    "few": "Pocos",
+    "complete": "Completos",
+    "controls": "Controles",
+    "click_select": "Clic: Seleccionar celda",
+    "arrows_navigate": "Flechas: Navegar",
+    "backspace_erase": "Backspace: Borrar",
+    "numbers_place": "Números 1-9: Colocar",
+    "erase_disabled": "Borrar (Deshabilitado)",
+    "hint_count": "Pista",
+    "legend": "Leyenda:",
+    "available_3plus": "Disponibles (3+)",
+    "few_2less": "Pocos (≤2)",
+    "complete_0": "Completos (0)",
+    "difficulty_label": "Dificultad:",
+    "progress_label": "Progreso:",
+    "time_label": "Tiempo:",
+    "movements_label": "Movimientos:",
+    "hints_used_label": "Pistas usadas:",
+    "completed_label": "Completadas:"
+  },
+  "buttons": {
+    "place": "Colocar",
+    "success": "Éxito"
+  },
+  "modal": {
+    "continue": "Continuar",
+    "new": "Nueva"
+  },
+  "continue": {
+    "title": "💾 ¿Continuar partida anterior?",
+    "button_continue": "💾 Continuar",
+    "button_new": "🆕 Nueva"
+  },
+  "settings": {
+    "sound": "Sonido",
+    "volume": "Volumen:"
+  },
+  "cell": {
+    "info": "Celda: Fila {row}, Columna {col} (Editable)",
+    "row": "Fila",
+    "column": "Columna",
+    "editable": "Editable"
+  },
+  "achievements": {
+    "first_step": {
+      "name": "Primer Paso",
+      "description": "¡Completa tu primer puzzle de Sudoku!"
+    },
+    "puzzle_master": {
+      "name": "Maestro de Puzzles",
+      "description": "Completa 10 puzzles"
+    },
+    "sudoku_legend": {
+      "name": "Leyenda del Sudoku",
+      "description": "Completa 50 puzzles"
+    },
+    "speed_demon": {
+      "name": "Demonio de Velocidad",
+      "description": "Completa un puzzle en menos de 5 minutos"
+    },
+    "lightning_fast": {
+      "name": "Rayo Veloz",
+      "description": "Completa un puzzle en menos de 3 minutos"
+    },
+    "easy_champion": {
+      "name": "Campeón Fácil",
+      "description": "Completa 5 puzzles fáciles"
+    },
+    "expert_challenger": {
+      "name": "Desafiante Experto",
+      "description": "Completa tu primer puzzle Expert"
+    },
+    "master_conqueror": {
+      "name": "Conquistador Maestro",
+      "description": "Completa tu primer puzzle Master"
+    },
+    "strategic_mind": {
+      "name": "Mente Estratégica",
+      "description": "Completa un puzzle sin usar pistas"
+    },
+    "hint_seeker": {
+      "name": "Buscador de Pistas",
+      "description": "Usa 10 pistas en total"
+    },
+    "winning_streak": {
+      "name": "Racha Ganadora",
+      "description": "Completa 3 puzzles seguidos"
+    },
+    "unstoppable": {
+      "name": "Imparable",
+      "description": "Completa 5 puzzles seguidos"
+    },
+    "perfect_game": {
+      "name": "Juego Perfecto",
+      "description": "Completa un puzzle sin errores"
+    },
+    "efficient_solver": {
+      "name": "Solucionador Eficiente",
+      "description": "Completa un puzzle con menos de 100 movimientos"
+    },
+    "century_club": {
+      "name": "Club del Centenario",
+      "description": "Completa 100 puzzles"
+    },
+    "flash_solver": {
+      "name": "Solucionador Flash",
+      "description": "Completa un puzzle en menos de 2 minutos"
+    },
+    "medium_master": {
+      "name": "Maestro Medio",
+      "description": "Completa 5 puzzles de dificultad media"
+    },
+    "hard_hero": {
+      "name": "Héroe Difícil",
+      "description": "Completa 3 puzzles de dificultad difícil"
+    },
+    "independent_solver": {
+      "name": "Solucionador Independiente",
+      "description": "Completa 5 puzzles sin usar pistas"
+    },
+    "flawless_streak": {
+      "name": "Racha Impecable",
+      "description": "Completa 3 puzzles consecutivos sin errores"
+    },
+    "daily_player": {
+      "name": "Jugador Diario",
+      "description": "Juega durante 7 días consecutivos"
+    },
+    "night_owl": {
+      "name": "Búho Nocturno",
+      "description": "Completa un puzzle después de medianoche"
+    },
+    "early_bird": {
+      "name": "Madrugador",
+      "description": "Completa un puzzle antes de las 6 AM"
+    },
+    "weekend_warrior": {
+      "name": "Guerrero de Fin de Semana",
+      "description": "Completa 10 puzzles en fin de semana"
+    }
+  },
+  "achievements_modal": {
+    "locked": "Logro bloqueado - completa puzzles para desbloquearlo",
+    "unlocked_on": "Desbloqueado el",
+    "progress": "Progreso",
+    "completed": "Completado"
+  },
+  "messages": {
+    "congratulations": "¡FELICITACIONES!",
+    "excellent": "¡Excelente trabajo!",
+    "completed_in": "Puzzle completado en:",
+    "difficulty": "Dificultad:",
+    "movements": "Movimientos:",
+    "new_achievement": "nuevo logro desbloqueado",
+    "new_achievements": "nuevos logros desbloqueados",
+    "error_detected": "Error detectado",
+    "errors_detected": "errores detectados",
+    "duplicated_numbers": "Hay números duplicados en el tablero",
+    "no_hints": "⚠️ Se han agotado las pistas para este puzzle (máximo 3 por juego)",
+    "puzzle_complete": "🎉 El puzzle ya está completado. ¡No necesitas más pistas!",
+    "continue_previous": "💾 ¿Continuar partida anterior?",
+    "continue": "💾 Continuar",
+    "new_game": "🆕 Nueva",
+    "great": "🎉 ¡Genial!",
+    "view_all": "🏆 Ver todos",
+    "more_achievement": "logro más",
+    "more_achievements": "logros más"
+  },
+  "stats": {
+    "progress": "Progreso",
+    "completed": "Completadas:",
+    "progress_percent": "Progreso:",
+    "movements": "Movimientos:",
+    "hints_used": "Pistas usadas:",
+    "difficulty": "Dificultad:",
+    "time": "Tiempo:",
+    "can_erase": "Habilitado",
+    "cannot_erase": "Deshabilitado"
+  },
+  "sound": {
+    "title": "🎵 Sonido",
+    "on": "🔊 ON",
+    "off": "🔇 OFF",
+    "volume": "Volumen:",
+    "test_place": "🔢 Colocar",
+    "test_hint": "💡 Pista",
+    "test_success": "🎉 Éxito"
+  },
+  "achievements": {
+    "title": "🏆 Logros",
+    "unlocked": "🎉 ¡Logro Desbloqueado!",
+    "locked": "Logro bloqueado - completa puzzles para desbloquearlo",
+    "unlocked_on": "Desbloqueado el",
+    "general_progress": "📊 Progreso General",
+    "completed": "Completados:",
+    "progress": "Progreso:",
+    "load_message": "¡Los logros se cargarán cuando completes tu primer puzzle!"
+  },
+  "language": {
+    "switch_to_english": "Cambiar a Inglés",
+    "switch_to_spanish": "Cambiar a Español"
+  }
+}

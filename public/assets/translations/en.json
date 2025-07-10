@@ -1,0 +1,234 @@
+{
+  "header": {
+    "title": "Minimalist Sudoku",
+    "new": "New",
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard",
+      "expert": "Expert",
+      "master": "Master"
+    },
+    "achievements": "Achievements",
+    "analytics": "Analytics",
+    "test_api": "Test API"
+  },
+  "game": {
+    "loading": "Loading puzzle...",
+    "completed": "Puzzle Completed!",
+    "time": "Time",
+    "movements": "Moves",
+    "hints": "Hints",
+    "progress": "Progress",
+    "erase": "Erase",
+    "hint": "Hint",
+    "save": "Save now",
+    "save_now": "💾 Save now",
+    "saving": "💾 Saving...",
+    "saved": "✅ Saved",
+    "retry": "❌ Retry",
+    "numbers": "Numbers",
+    "available": "Available",
+    "few": "Few",
+    "complete": "Complete",
+    "controls": "Controls",
+    "click_select": "Click: Select cell",
+    "arrows_navigate": "Arrows: Navigate",
+    "backspace_erase": "Backspace: Erase",
+    "numbers_place": "Numbers 1-9: Place",
+    "erase_disabled": "Erase (Disabled)",
+    "hint_count": "Hint",
+    "legend": "Legend:",
+    "available_3plus": "Available (3+)",
+    "few_2less": "Few (≤2)",
+    "complete_0": "Complete (0)",
+    "difficulty_label": "Difficulty:",
+    "progress_label": "Progress:",
+    "time_label": "Time:",
+    "movements_label": "Moves:",
+    "hints_used_label": "Hints used:",
+    "completed_label": "Completed:"
+  },
+  "buttons": {
+    "place": "Place",
+    "success": "Success"
+  },
+  "modal": {
+    "continue": "Continue",
+    "new": "New"
+  },
+  "continue": {
+    "title": "💾 Continue previous game?",
+    "button_continue": "💾 Continue",
+    "button_new": "🆕 New"
+  },
+  "settings": {
+    "sound": "Sound",
+    "volume": "Volume:"
+  },
+  "cell": {
+    "info": "Cell: Row {row}, Column {col} (Editable)",
+    "row": "Row",
+    "column": "Column",
+    "editable": "Editable"
+  },
+  "achievements": {
+    "first_step": {
+      "name": "First Step",
+      "description": "Complete your first Sudoku puzzle!"
+    },
+    "puzzle_master": {
+      "name": "Puzzle Master",
+      "description": "Complete 10 puzzles"
+    },
+    "sudoku_legend": {
+      "name": "Sudoku Legend",
+      "description": "Complete 50 puzzles"
+    },
+    "speed_demon": {
+      "name": "Speed Demon",
+      "description": "Complete a puzzle in less than 5 minutes"
+    },
+    "lightning_fast": {
+      "name": "Lightning Fast",
+      "description": "Complete a puzzle in less than 3 minutes"
+    },
+    "easy_champion": {
+      "name": "Easy Champion",
+      "description": "Complete 5 easy puzzles"
+    },
+    "expert_challenger": {
+      "name": "Expert Challenger",
+      "description": "Complete your first Expert puzzle"
+    },
+    "master_conqueror": {
+      "name": "Master Conqueror",
+      "description": "Complete your first Master puzzle"
+    },
+    "strategic_mind": {
+      "name": "Strategic Mind",
+      "description": "Complete a puzzle without using hints"
+    },
+    "hint_seeker": {
+      "name": "Hint Seeker",
+      "description": "Use 10 hints in total"
+    },
+    "winning_streak": {
+      "name": "Winning Streak",
+      "description": "Complete 3 puzzles in a row"
+    },
+    "unstoppable": {
+      "name": "Unstoppable",
+      "description": "Complete 5 puzzles in a row"
+    },
+    "perfect_game": {
+      "name": "Perfect Game",
+      "description": "Complete a puzzle without errors"
+    },
+    "efficient_solver": {
+      "name": "Efficient Solver",
+      "description": "Complete a puzzle with less than 100 moves"
+    },
+    "century_club": {
+      "name": "Century Club",
+      "description": "Complete 100 puzzles"
+    },
+    "flash_solver": {
+      "name": "Flash Solver",
+      "description": "Complete a puzzle in less than 2 minutes"
+    },
+    "medium_master": {
+      "name": "Medium Master",
+      "description": "Complete 5 medium difficulty puzzles"
+    },
+    "hard_hero": {
+      "name": "Hard Hero",
+      "description": "Complete 3 hard difficulty puzzles"
+    },
+    "independent_solver": {
+      "name": "Independent Solver",
+      "description": "Complete 5 puzzles without using hints"
+    },
+    "flawless_streak": {
+      "name": "Flawless Streak",
+      "description": "Complete 3 consecutive puzzles without errors"
+    },
+    "daily_player": {
+      "name": "Daily Player",
+      "description": "Play for 7 consecutive days"
+    },
+    "night_owl": {
+      "name": "Night Owl",
+      "description": "Complete a puzzle after midnight"
+    },
+    "early_bird": {
+      "name": "Early Bird",
+      "description": "Complete a puzzle before 6 AM"
+    },
+    "weekend_warrior": {
+      "name": "Weekend Warrior",
+      "description": "Complete 10 puzzles on weekends"
+    }
+  },
+  "achievements_modal": {
+    "locked": "Locked achievement - complete puzzles to unlock it",
+    "unlocked_on": "Unlocked on",
+    "progress": "Progress",
+    "completed": "Completed"
+  },
+  "messages": {
+    "congratulations": "CONGRATULATIONS!",
+    "excellent": "Excellent work!",
+    "completed_in": "Puzzle completed in:",
+    "difficulty": "Difficulty:",
+    "movements": "Moves:",
+    "new_achievement": "new achievement unlocked",
+    "new_achievements": "new achievements unlocked",
+    "error_detected": "Error detected",
+    "errors_detected": "errors detected",
+    "duplicated_numbers": "There are duplicate numbers on the board",
+    "no_hints": "⚠️ No hints remaining for this puzzle (maximum 3 per game)",
+    "puzzle_complete": "🎉 Puzzle already completed. You don't need more hints!",
+    "continue_previous": "💾 Continue previous game?",
+    "continue": "💾 Continue",
+    "new_game": "🆕 New",
+    "great": "🎉 Great!",
+    "view_all": "🏆 View all",
+    "more_achievement": "more achievement",
+    "more_achievements": "more achievements"
+  },
+  "stats": {
+    "progress": "Progress",
+    "completed": "Completed:",
+    "progress_percent": "Progress:",
+    "movements": "Moves:",
+    "hints_used": "Hints used:",
+    "difficulty": "Difficulty:",
+    "time": "Time:",
+    "can_erase": "Enabled",
+    "cannot_erase": "Disabled"
+  },
+  "sound": {
+    "title": "🎵 Sound",
+    "on": "🔊 ON",
+    "off": "🔇 OFF",
+    "volume": "Volume:",
+    "test_place": "🔢 Place",
+    "test_hint": "💡 Hint",
+    "test_success": "🎉 Success"
+  },
+  "achievements": {
+    "title": "🏆 Achievements",
+    "unlocked": "🎉 Achievement Unlocked!",
+    "locked": "Locked achievement - complete puzzles to unlock it",
+    "unlocked_on": "Unlocked on",
+    "general_progress": "📊 General Progress",
+    "completed": "Completed:",
+    "progress": "Progress:",
+    "load_message": "Achievements will load when you complete your first puzzle!"
+  },
+  "language": {
+    "switch_to_english": "Switch to English",
+    "switch_to_spanish": "Switch to Spanish"
+  }
+}

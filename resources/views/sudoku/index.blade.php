@@ -253,6 +253,138 @@
             useEffect(() => {
                 localStorage.setItem('sudoku_sound_volume', soundVolume.toString());
             }, [soundVolume]);
+            
+            // 🌍 SISTEMA DE TRADUCCIONES
+            const useTranslations = () => {
+                const [language, setLanguage] = useState(() => {
+                    // 1. Verificar localStorage
+                    const saved = localStorage.getItem('sudoku_language');
+                    if (saved) return saved;
+                    
+                    // 2. Detección automática del navegador
+                    const browserLang = navigator.language.startsWith('es') ? 'es' : 'en';
+                    return browserLang;
+                });
+                
+                const [translations, setTranslations] = useState({});
+                const [translationsLoading, setTranslationsLoading] = useState(true);
+                
+                // Cargar traducciones
+                useEffect(() => {
+                    const loadTranslations = async () => {
+                        try {
+                            const response = await fetch(`/Sudoku/public/assets/translations/${language}.json`);
+                            const data = await response.json();
+                            setTranslations(data);
+                            console.log(`🌍 Traducciones cargadas: ${language}`);
+                            console.log('🔍 DEBUG: Verificando sección de achievements:', {
+                                hasAchievements: !!data.achievements,
+                                achievementKeys: data.achievements ? Object.keys(data.achievements) : [],
+                                sampleAchievement: data.achievements?.first_step
+                            });
+                        } catch (error) {
+                            console.log('⚠️ Error cargando traducciones, usando fallback español');
+                            // Fallback básico en español
+                            setTranslations({
+                                header: { title: "Sudoku Minimalista", new: "Nuevo" },
+                                game: { loading: "Cargando...", hint: "Pista", erase: "Borrar" },
+                                messages: { congratulations: "¡FELICITACIONES!" }
+                            });
+                        }
+                        setTranslationsLoading(false);
+                    };
+                    
+                    loadTranslations();
+                }, [language]);
+                
+                // Guardar preferencia
+                useEffect(() => {
+                    localStorage.setItem('sudoku_language', language);
+                }, [language]);
+                
+                // Función helper para obtener traducciones
+                const t = (key) => {
+                    const keys = key.split('.');
+                    let value = translations;
+                    
+                    for (const k of keys) {
+                        value = value?.[k];
+                        if (!value) break;
+                    }
+                    
+                    return value || key; // Fallback al key si no encuentra traducción
+                };
+                
+                return { t, language, setLanguage, translationsLoading };
+            };
+            
+            // ✅ INICIALIZAR SISTEMA DE TRADUCCIONES
+            const { t, language, setLanguage, translationsLoading, translations } = useTranslations();
+            
+            // Función helper para obtener traducciones de logros (SIN HOOKS)
+            const getAchievementText = (translations, keyName, field, fallback) => {
+                console.log('🔍 getAchievementText:', { translations: !!translations, keyName, field, fallback });
+                console.log('🔍 translations.achievements:', translations?.achievements);
+                console.log('🔍 keyName lookup:', translations?.achievements?.[keyName]);
+                
+                const result = translations?.achievements?.[keyName]?.[field] || fallback || '';
+                console.log('🔍 Result:', result);
+                return result;
+            };
+            
+            // Debug: verificar el estado de las traducciones
+            console.log('🔍 DEBUG: Estado actual de traducciones:', {
+                translationsLoading,
+                hasTranslations: !!translations,
+                hasAchievements: !!translations?.achievements,
+                language
+            });
+            
+            // Función helper para obtener traducciones de logros (SIN HOOKS)
+            const getAchievementText = (translations, keyName, field, fallback) => {
+                // Debug: verificar si las traducciones están disponibles
+                console.log('🔍 DEBUG getAchievementText:', {
+                    hasTranslations: !!translations,
+                    hasAchievements: !!translations?.achievements,
+                    keyName,
+                    field,
+                    fallback,
+                    achievementExists: !!translations?.achievements?.[keyName],
+                    fieldExists: !!translations?.achievements?.[keyName]?.[field],
+                    translatedText: translations?.achievements?.[keyName]?.[field]
+                });
+                
+                // Intentar obtener la traducción
+                const translatedText = translations?.achievements?.[keyName]?.[field];
+                
+                // Retornar traducción si existe, sino el fallback
+                return translatedText || fallback || '';
+            };
+            
+            // 🌍 COMPONENTE: SELECTOR DE IDIOMA
+            const LanguageSelector = () => {
+                const toggleLanguage = () => {
+                    const newLang = language === 'es' ? 'en' : 'es';
+                    setLanguage(newLang);
+                    
+                    // Sonido de confirmación si está habilitado
+                    if (soundEnabled) {
+                        playSound.click();
+                    }
+                    
+                    console.log(`🌍 Idioma cambiado a: ${newLang}`);
+                };
+                
+                return React.createElement('button', {
+                    onClick: toggleLanguage,
+                    className: `px-3 py-1 rounded-md text-sm font-medium transition-colors border ${
+                        isDarkMode 
+                            ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                            : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300'
+                    }`,
+                    title: language === 'es' ? t('language.switch_to_english') : t('language.switch_to_spanish')
+                }, `🌍 ${language.toUpperCase()}`);
+            };
 
             const API_BASE = '/Sudoku/public/api';
             const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -976,12 +1108,12 @@
             // 💡 SISTEMA DE PISTAS INTELIGENTE
             const getHint = async () => {
                 if (hintsRemaining <= 0) {
-                    alert('⚠️ Se han agotado las pistas para este puzzle (máximo 3 por juego)');
+                    alert(t('messages.no_hints'));
                     return;
                 }
                 
                 if (puzzleCompleted) {
-                    alert('🎉 El puzzle ya está completado. ¡No necesitas más pistas!');
+                    alert(t('messages.puzzle_complete'));
                     return;
                 }
                 
@@ -1635,12 +1767,13 @@
                 };
             };
 
-            if (loading) {
+            // ✅ LOADING MEJORADO: Incluir traducciones
+            if (loading || translationsLoading) {
                 return (
                     <div className="min-h-screen flex items-center justify-center">
                         <div className="text-center">
                             <div className="loading-spinner rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                            <p className="text-gray-600">Cargando puzzle...</p>
+                            <p className="text-gray-600">{translationsLoading ? 'Cargando idioma...' : t('game.loading')}</p>
                         </div>
                     </div>
                 );
@@ -1656,7 +1789,7 @@
                             <div className={`p-6 rounded-lg shadow-xl max-w-md w-full mx-4 ${
                                 isDarkMode ? 'bg-gray-800 border border-gray-600' : 'bg-white border border-gray-200'
                             }`}>
-                                <h3 className="text-lg font-bold mb-4">💾 ¿Continuar partida anterior?</h3>
+                                <h3 className="text-lg font-bold mb-4">{t('messages.continue_previous')}</h3>
                                 
                                 {savedGameData && (
                                     <div className={`mb-4 p-3 rounded-lg ${
@@ -1670,7 +1803,7 @@
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span>Progreso:</span>
+                                                <span>{t('game.progress_label')}</span>
                                                 <span className="font-medium">
                                                     {savedGameData.current_state ? 
                                                         Math.round(((81 - savedGameData.current_state.split('0').length + 1) / 81) * 100)
@@ -1678,13 +1811,13 @@
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span>Tiempo:</span>
+                                                <span>{t('game.time_label')}</span>
                                                 <span className="font-medium">
                                                     {formatTime(savedGameData.time_spent || 0)}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span>Movimientos:</span>
+                                                <span>{t('game.movements_label')}</span>
                                                 <span className="font-medium">{savedGameData.moves_count || 0}</span>
                                             </div>
                                         </div>
@@ -1700,7 +1833,7 @@
                                                 : 'bg-blue-500 hover:bg-blue-600 text-white'
                                         }`}
                                     >
-                                        💾 Continuar
+                                        {t('messages.continue')}
                                     </button>
                                     <button
                                         onClick={startNewGame}
@@ -1710,7 +1843,7 @@
                                                 : 'bg-gray-200 hover:bg-gray-300 text-gray-800 border border-gray-300'
                                         }`}
                                     >
-                                        🆕 Nueva
+                                        {t('messages.new_game')}
                                     </button>
                                 </div>
                             </div>
@@ -1726,7 +1859,7 @@
                                 <div className="text-6xl mb-4 animate-bounce">{unlockedAchievement.icon}</div>
                                 
                                 <h3 className="text-xl font-bold mb-2 text-yellow-600">
-                                    🎉 ¡Logro Desbloqueado!
+                                    {t('achievements.unlocked')}
                                 </h3>
                                 
                                 <h4 className="text-lg font-semibold mb-3">
@@ -1748,7 +1881,7 @@
                                                 : 'bg-yellow-500 hover:bg-yellow-600 text-white'
                                         }`}
                                     >
-                                        🎉 ¡Genial!
+                                        {t('messages.great')}
                                     </button>
                                     
                                     <button
@@ -1762,7 +1895,7 @@
                                                 : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300'
                                         }`}
                                     >
-                                        🏆 Ver todos
+                                        {t('messages.view_all')}
                                     </button>
                                 </div>
                                 
@@ -1788,7 +1921,7 @@
                                 }`}>
                                     <div className="flex justify-between items-center">
                                         <h3 className="text-2xl font-bold flex items-center gap-2">
-                                            🏆 Logros
+                                            {t('achievements.title')}
                                             <span className={`text-sm px-2 py-1 rounded-md ${
                                                 isDarkMode ? 'bg-yellow-800 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
                                             }`}>
@@ -1814,7 +1947,7 @@
                                             <p className={`text-lg ${
                                                 isDarkMode ? 'text-gray-300' : 'text-gray-600'
                                             }`}>
-                                                ¡Los logros se cargarán cuando completes tu primer puzzle!
+                                                            {t('achievements.load_message')}
                                             </p>
                                         </div>
                                     ) : (
@@ -1822,6 +1955,15 @@
                                             {achievements.map((achievement, index) => {
                                                 const isCompleted = achievement.is_completed;
                                                 const isLocked = !isCompleted;
+                                                
+                                                // Debug: verificar cada logro
+                                                console.log('🔍 Processing achievement:', {
+                                                    name: achievement.name,
+                                                    keyName: achievement.key_name,
+                                                    isCompleted,
+                                                    hasTranslations: !!translations,
+                                                    currentLanguage: language
+                                                });
                                                 
                                                 return (
                                                     <div
@@ -1849,7 +1991,7 @@
                                                                         ? isDarkMode ? 'text-yellow-200' : 'text-yellow-800'
                                                                         : isDarkMode ? 'text-gray-300' : 'text-gray-600'
                                                                 }`}>
-                                                                    {isLocked ? '???' : achievement.name}
+                                                                    {isLocked ? '???' : getAchievementText(translations, achievement.key_name, 'name', achievement.name)}
                                                                 </h4>
                                                                 
                                                                 <p className={`text-sm mt-1 ${
@@ -1857,14 +1999,14 @@
                                                                         ? isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
                                                                         : isDarkMode ? 'text-gray-400' : 'text-gray-500'
                                                                 }`}>
-                                                                    {isLocked ? 'Logro bloqueado - completa puzzles para desbloquearlo' : achievement.description}
+                                                                    {isLocked ? t('achievements_modal.locked') : getAchievementText(translations, achievement.key_name, 'description', achievement.description)}
                                                                 </p>
                                                                 
                                                                 {isCompleted && achievement.unlocked_at && (
                                                                     <p className={`text-xs mt-2 ${
                                                                         isDarkMode ? 'text-yellow-400' : 'text-yellow-600'
                                                                     }`}>
-                                                                        ✨ Desbloqueado el {new Date(achievement.unlocked_at).toLocaleDateString()}
+                                                                        ✨ {t('achievements.unlocked_on')} {new Date(achievement.unlocked_at).toLocaleDateString()}
                                                                     </p>
                                                                 )}
                                                             </div>
@@ -1885,7 +2027,7 @@
                                         <div className={`mt-6 p-4 rounded-lg border ${
                                             isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-300'
                                         }`}>
-                                            <h4 className="font-semibold mb-2">📊 Progreso General</h4>
+                                            <h4 className="font-semibold mb-2">{t('achievements.general_progress')}</h4>
                                             
                                             <div className={`w-full bg-gray-300 rounded-full h-3 mb-3 ${
                                                 isDarkMode ? 'bg-gray-600' : 'bg-gray-300'
@@ -1900,13 +2042,13 @@
                                             
                                             <div className="grid grid-cols-2 gap-4 text-sm">
                                                 <div>
-                                                    <span className="font-medium">Completados:</span>
+                                                    <span className="font-medium">{t('achievements.completed')}</span>
                                                     <span className="ml-2 font-mono">
                                                         {achievements.filter(a => a.is_completed).length}/{achievements.length}
                                                     </span>
                                                 </div>
                                                 <div>
-                                                    <span className="font-medium">Progreso:</span>
+                                                    <span className="font-medium">{t('achievements.progress')}</span>
                                                     <span className="ml-2 font-mono">
                                                         {Math.round((achievements.filter(a => a.is_completed).length / achievements.length) * 100)}%
                                                     </span>
@@ -2391,7 +2533,7 @@
         style={{display: 'none'}} 
         className={isDarkMode ? 'text-2xl font-bold text-white' : 'text-2xl font-bold text-gray-900'}
     >
-        Sudoku Minimalista
+        {t('header.title')}
     </span>
 </div>
                                     <div className="flex items-center gap-2 text-sm">
@@ -2413,8 +2555,8 @@
                                                         ? isDarkMode ? 'bg-green-800 text-green-200' : 'bg-green-100 text-green-800'
                                                         : isDarkMode ? 'bg-red-800 text-red-200' : 'bg-red-100 text-red-800'
                                             }`}>
-                                                {autoSaveStatus === 'saving' && '💾 Guardando...'}
-                                                {autoSaveStatus === 'saved' && '✅ Guardado'}
+                                                {autoSaveStatus === 'saving' && t('game.saving')}
+                                                {autoSaveStatus === 'saved' && t('game.saved')}
                                                 {autoSaveStatus === 'error' && '❌ Error'}
                                             </span>
                                         )}
@@ -2435,11 +2577,11 @@
                                             isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'
                                         }`}
                                     >
-                                        <option value="easy">Fácil</option>
-                                        <option value="medium">Medio</option>
-                                        <option value="hard">Difícil</option>
-                                        <option value="expert">Experto</option>
-                                        <option value="master">Maestro</option>
+                                        <option value="easy">{t('header.difficulty.easy')}</option>
+                                        <option value="medium">{t('header.difficulty.medium')}</option>
+                                        <option value="hard">{t('header.difficulty.hard')}</option>
+                                        <option value="expert">{t('header.difficulty.expert')}</option>
+                                        <option value="master">{t('header.difficulty.master')}</option>
                                     </select>
                                     
                                     <button
@@ -2450,7 +2592,7 @@
                                                 : 'bg-blue-500 hover:bg-blue-600 text-white'
                                         }`}
                                     >
-                                        Nuevo
+                                        {t('header.new')}
                                     </button>
                                     
                                     {/* 📊 Botón de Test API (temporal) */}
@@ -2483,9 +2625,9 @@
                                                 ? 'bg-yellow-600 hover:bg-yellow-700 text-white' 
                                                 : 'bg-yellow-500 hover:bg-yellow-600 text-white'
                                         }`}
-                                        title="Ver logros"
+                                        title={t('header.achievements')}
                                     >
-                                        🏆 Logros
+                                        🏆 {t('header.achievements')}
                                         {achievements.filter(a => a.is_completed).length > 0 && (
                                             <span className={`absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
                                                 isDarkMode ? 'bg-yellow-400 text-yellow-900' : 'bg-yellow-300 text-yellow-800'
@@ -2505,7 +2647,7 @@
                                         }`}
                                         title="Ver analíticas"
                                     >
-                                        📊 Analytics
+                                        📊 {t('header.analytics')}
                                     </button>
                                     
                                     {/* 🎵 BOTÓN DE SONIDO */}
@@ -2524,6 +2666,9 @@
                                     >
                                         {soundEnabled ? '🔊' : '🔇'}
                                     </button>
+                                    
+                                    {/* 🌍 SELECTOR DE IDIOMA */}
+                                    <LanguageSelector />
                                     
                                     <button
                                         onClick={() => setIsDarkMode(!isDarkMode)}
@@ -2622,7 +2767,7 @@
                                 <div className={`p-4 rounded-lg shadow-lg ${
                                     isDarkMode ? 'bg-gray-800' : 'bg-white'
                                 }`}>
-                                    <h3 className="text-lg font-semibold mb-4">Números</h3>
+                                    <h3 className="text-lg font-semibold mb-4">{t('game.numbers')}</h3>
                                     
                                     <div className="grid grid-cols-3 gap-3 mb-4">
                                         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(number => (
@@ -2688,7 +2833,7 @@
                                             }
                                         `}
                                     >
-                                        🗑️ Borrar {canErase ? '(Habilitado)' : '(Deshabilitado)'}
+                                        🗑️ {canErase ? t('game.erase') : t('game.erase_disabled')}
                                     </button>
                                     
                                     {/* 💡 BOTÓN DE PISTAS */}
@@ -2707,7 +2852,7 @@
                                             }
                                         `}
                                     >
-                                        💡 Pista ({hintsRemaining}/3)
+                                        💡 {t('game.hint_count')} ({hintsRemaining}/3)
                                     </button>
                                     
                                     {/* 💾 BOTÓN DE GUARDADO MANUAL */}
@@ -2729,33 +2874,33 @@
                                         {autoSaveStatus === 'saving' ? '💾 Guardando...' : 
                                          autoSaveStatus === 'saved' ? '✅ Guardado' :
                                          autoSaveStatus === 'error' ? '❌ Reintentar' :
-                                         '💾 Guardar ahora'}
+                                         `${t('game.save_now')}`}
                                     </button>
 
                                     {/* Estadísticas */}
                                     <div className={`mt-4 p-3 rounded-lg ${
                                         isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
                                     }`}>
-                                        <h4 className="font-medium mb-2">Progreso</h4>
+                                        <h4 className="font-medium mb-2">Progress</h4>
                                         <div className="space-y-1 text-sm">
                                             <div className="flex justify-between">
-                                                <span>Completadas:</span>
+                                                <span>{t('game.completed_label')}</span>
                                                 <span className="font-mono">
                                                     {81 - board.flat().filter(cell => cell === 0).length}/81
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span>Progreso:</span>
+                                                <span>{t('game.progress_label')}</span>
                                                 <span className={`font-mono ${puzzleCompleted ? 'text-green-600 font-bold' : ''}`}>
                                                     {Math.round(((81 - board.flat().filter(cell => cell === 0).length) / 81) * 100)}%
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span>Movimientos:</span>
+                                                <span>{t('game.movements_label')}</span>
                                                 <span className="font-mono">{gameStats.movesCount}</span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span>Pistas usadas:</span>
+                                                <span>{t('game.hints_used_label')}</span>
                                                 <span className={`font-mono ${(3 - hintsRemaining) > 0 ? 'text-yellow-600' : ''}`}>
                                                     {3 - hintsRemaining}/3
                                                 </span>
@@ -2768,7 +2913,7 @@
                                         isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
                                     }`}>
                                         <h4 className="font-medium mb-2 flex items-center gap-2">
-                                            🎵 Sonido
+                                            🎵 {t('settings.sound')}
                                             <button
                                                 onClick={toggleSound}
                                                 className={`text-xs px-2 py-1 rounded ${
@@ -2784,7 +2929,7 @@
                                         {soundEnabled && (
                                             <div className="space-y-2">
                                                 <div className="flex items-center gap-2 text-sm">
-                                                    <span>Volumen:</span>
+                                                    <span>{t('settings.volume')}</span>
                                                     <input
                                                         type="range"
                                                         min="0"
@@ -2811,7 +2956,7 @@
                                                             isDarkMode ? 'bg-blue-700 text-blue-200 hover:bg-blue-600' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
                                                         }`}
                                                     >
-                                                        🔢 Colocar
+                                                        🔢 {t('buttons.place')}
                                                     </button>
                                                     <button
                                                         onClick={() => playSound.hint()}
@@ -2819,7 +2964,7 @@
                                                             isDarkMode ? 'bg-yellow-700 text-yellow-200 hover:bg-yellow-600' : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
                                                         }`}
                                                     >
-                                                        💡 Pista
+                                                        💡 {t('game.hint_count')}
                                                     </button>
                                                     <button
                                                         onClick={() => playSound.success()}
@@ -2827,7 +2972,7 @@
                                                             isDarkMode ? 'bg-green-700 text-green-200 hover:bg-green-600' : 'bg-green-100 text-green-800 hover:bg-green-200'
                                                         }`}
                                                     >
-                                                        🎉 Éxito
+                                                        🎉 {t('buttons.success')}
                                                     </button>
                                                 </div>
                                             </div>
@@ -2838,27 +2983,27 @@
                                     <div className={`mt-4 p-3 rounded-lg text-xs ${
                                         isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
                                     }`}>
-                                        <h4 className="font-medium mb-2">Leyenda:</h4>
+                                        <h4 className="font-medium mb-2">{t('game.legend')}</h4>
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                                                <span>Disponibles (3+)</span>
+                                                <span>{t('game.available_3plus')}</span>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                                                <span>Pocos (≤2)</span>
+                                                <span>{t('game.few_2less')}</span>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-                                                <span>Completos (0)</span>
+                                                <span>{t('game.complete_0')}</span>
                                             </div>
                                         </div>
                                         <div className="mt-2 pt-2 border-t border-gray-400 text-xs">
-                                            <p><strong>Controles:</strong></p>
-                                            <p>• Números 1-9: Colocar</p>
-                                            <p>• Flechas: Navegar</p>
-                                            <p>• Backspace: Borrar</p>
-                                            <p>• Clic: Seleccionar celda</p>
+                                            <p><strong>{t('game.controls')}:</strong></p>
+                                            <p>• {t('game.numbers_place')}</p>
+                                            <p>• {t('game.arrows_navigate')}</p>
+                                            <p>• {t('game.backspace_erase')}</p>
+                                            <p>• {t('game.click_select')}</p>
                                         </div>
                                     </div>
 

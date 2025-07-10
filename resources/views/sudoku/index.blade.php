@@ -323,43 +323,26 @@
             
             // Función helper para obtener traducciones de logros (SIN HOOKS)
             const getAchievementText = (translations, keyName, field, fallback) => {
-                console.log('🔍 getAchievementText:', { translations: !!translations, keyName, field, fallback });
-                console.log('🔍 translations.achievements:', translations?.achievements);
-                console.log('🔍 keyName lookup:', translations?.achievements?.[keyName]);
-                
-                const result = translations?.achievements?.[keyName]?.[field] || fallback || '';
-                console.log('🔍 Result:', result);
+                // Debug removido para evitar bucle infinito en logros
+            // // Debug removido - console.log('🔍 getAchievementText:', { translations: !!translations, keyName, field, fallback });
+            // // Debug removido - console.log('🔍 translations.achievements:', translations?.achievements);
+            // console.log('🔍 keyName lookup:', translations?.achievements?.[keyName]);
+            
+            const result = translations?.achievements?.[keyName]?.[field] || fallback || '';
+            // console.log('🔍 Result:', result);
                 return result;
             };
             
             // Debug: verificar el estado de las traducciones
-            console.log('🔍 DEBUG: Estado actual de traducciones:', {
-                translationsLoading,
-                hasTranslations: !!translations,
-                hasAchievements: !!translations?.achievements,
-                language
-            });
+            // Debug removido para evitar bucle infinito
+            // console.log('🔍 DEBUG: Estado actual de traducciones:', {
+            //     translationsLoading,
+            //     hasTranslations: !!translations,
+            //     hasAchievements: !!translations?.achievements,
+            //     language
+            // });
             
-            // Función helper para obtener traducciones de logros (SIN HOOKS)
-            const getAchievementText = (translations, keyName, field, fallback) => {
-                // Debug: verificar si las traducciones están disponibles
-                console.log('🔍 DEBUG getAchievementText:', {
-                    hasTranslations: !!translations,
-                    hasAchievements: !!translations?.achievements,
-                    keyName,
-                    field,
-                    fallback,
-                    achievementExists: !!translations?.achievements?.[keyName],
-                    fieldExists: !!translations?.achievements?.[keyName]?.[field],
-                    translatedText: translations?.achievements?.[keyName]?.[field]
-                });
-                
-                // Intentar obtener la traducción
-                const translatedText = translations?.achievements?.[keyName]?.[field];
-                
-                // Retornar traducción si existe, sino el fallback
-                return translatedText || fallback || '';
-            };
+
             
             // 🌍 COMPONENTE: SELECTOR DE IDIOMA
             const LanguageSelector = () => {
@@ -1956,14 +1939,8 @@
                                                 const isCompleted = achievement.is_completed;
                                                 const isLocked = !isCompleted;
                                                 
-                                                // Debug: verificar cada logro
-                                                console.log('🔍 Processing achievement:', {
-                                                    name: achievement.name,
-                                                    keyName: achievement.key_name,
-                                                    isCompleted,
-                                                    hasTranslations: !!translations,
-                                                    currentLanguage: language
-                                                });
+                                                // Debug removido para evitar bucle infinito
+                                                // El console.log aquí causaba re-renderizados continuos
                                                 
                                                 return (
                                                     <div

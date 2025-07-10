@@ -82,7 +82,19 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# 🔄 Cache
+# 🔄 Cache y archivos temporales de optimización
 .phpunit.result.cache
 .php_cs.cache
 *.cache
+cache/
+cache/*
+!cache/.gitkeep
+optimization/cache/
+performance_*.log
+api_errors.log
+security.log
+
+# 🧪 Archivos de test específicos
+test_optimizations_*.log
+apply_optimizations_*.log
+performance_test_*.json

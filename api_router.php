@@ -5,10 +5,15 @@ if (!session_id()) {
     session_start();
 }
 
-// Cargar sistemas de seguridad
+// Cargar sistemas de seguridad y optimización
 require_once __DIR__ . '/security/csrf.php';
 require_once __DIR__ . '/security/cors.php';
+require_once __DIR__ . '/optimization/cache.php';
+require_once __DIR__ . '/optimization/performance.php';
 require_once __DIR__ . '/simple_autoload.php';
+
+// Iniciar monitoreo de performance
+PerformanceMiddleware::before();
 
 // Aplicar configuración CORS segura
 CORSConfig::handlePreflight();
@@ -249,4 +254,16 @@ function executeController($controllerInfo, $route, $params = [])
             ]
         ]);
     }
+}
+
+// Finalizar monitoreo de performance
+$performanceMetrics = PerformanceMiddleware::after(true);
+
+// Log de métricas si hay problemas
+if ($performanceMetrics['execution_time_ms'] > 500) {
+    error_log("⚠️ Respuesta lenta detectada: " . $performanceMetrics['execution_time_ms'] . "ms para $route");
+}
+
+if ($performanceMetrics['cache_hit_ratio'] < 60 && $performanceMetrics['cache_hits'] + $performanceMetrics['cache_misses'] > 0) {
+    error_log("⚠️ Cache hit ratio bajo: " . $performanceMetrics['cache_hit_ratio'] . "% para $route");
 }

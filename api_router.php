@@ -5,18 +5,28 @@ if (!session_id()) {
     session_start();
 }
 
-// Cargar autoload simple en lugar del de Composer
+// Cargar sistemas de seguridad
+require_once __DIR__ . '/security/csrf.php';
+require_once __DIR__ . '/security/cors.php';
 require_once __DIR__ . '/simple_autoload.php';
 
-// Configurar headers para API
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+// Aplicar configuración CORS segura
+CORSConfig::handlePreflight();
+CORSConfig::applyHeaders();
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(0);
+// Validar origen en requests importantes
+if ($_SERVER['REQUEST_METHOD'] !== 'GET' && !CORSConfig::validateOrigin()) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Origen no permitido']);
+    exit;
 }
+
+// Validar CSRF en requests POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    CSRFProtection::validateRequest();
+}
+
+header('Content-Type: application/json');
 
 // Parsear la ruta
 $requestUri = $_SERVER['REQUEST_URI'];

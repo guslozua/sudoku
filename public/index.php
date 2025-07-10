@@ -5,6 +5,9 @@ if (!session_id()) {
     session_start();
 }
 
+// Cargar sistema CSRF
+require_once __DIR__ . '/../security/csrf.php';
+
 $requestUri = $_SERVER['REQUEST_URI'];
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -22,8 +25,9 @@ if (preg_match('#^(/Sudoku/public/?|/?)$#', $requestUri)) {
     // Cargar la vista del juego
     $content = file_get_contents(__DIR__ . '/../resources/views/sudoku/index.blade.php');
     
-    // Procesar directivas blade básicas
-    $content = str_replace('{{ csrf_token() }}', 'dummy-csrf-token', $content);
+    // Procesar directivas blade básicas con token CSRF real
+    $csrfToken = CSRFProtection::getToken();
+    $content = str_replace('{{ csrf_token() }}', $csrfToken, $content);
     
     echo $content;
     exit;

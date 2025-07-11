@@ -607,6 +607,47 @@ body {
   outline-offset: 2px;
 }
 
+/* ☀️ MEJORAS VISUALES PARA HIGHLIGHTING */
+.sudoku-cell {
+  position: relative;
+  transition: all 0.15s ease-out;
+}
+
+.sudoku-cell:hover:not(:disabled) {
+  transform: scale(1.02);
+  z-index: 1;
+}
+
+.cell-same-number {
+  animation: pulse-highlight 0.3s ease-out;
+}
+
+@keyframes pulse-highlight {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* 🎨 ESTILOS PARA EL LOGO */
+.sudoku-logo {
+  height: 32px;
+  width: auto;
+  transition: all 0.3s ease;
+  object-fit: contain;
+}
+
+.sudoku-logo:hover {
+  transform: scale(1.05);
+}
+
+.sudoku-logo.dark-mode {
+  filter: brightness(1.2) contrast(1.1);
+}
+
+.sudoku-logo.light-mode {
+  filter: brightness(0.9) contrast(1.05);
+}
+
 /* ===== PRINT STYLES ===== */
 
 @media print {

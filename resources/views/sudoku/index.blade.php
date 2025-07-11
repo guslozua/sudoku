@@ -54,6 +54,9 @@
     <!-- 📱 MOBILE-FIRST CSS OPTIMIZATIONS -->
     <link rel="stylesheet" href="/Sudoku/public/assets/css/mobile-optimizations.css">
     
+    <!-- 🌙 ADVANCED THEME SYSTEM -->
+    <link rel="stylesheet" href="/Sudoku/public/assets/css/advanced-theme.css">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -196,7 +199,7 @@
     <div id="sudoku-app"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useCallback } = React;
 
         const SudokuApp = () => {
             // Función para hacer copia profunda de arrays 2D
@@ -206,7 +209,26 @@
             const [initialBoard, setInitialBoard] = useState(Array(9).fill().map(() => Array(9).fill(0)));
             const [selectedCell, setSelectedCell] = useState(null);
             const [selectedNumber, setSelectedNumber] = useState(null);
-            const [isDarkMode, setIsDarkMode] = useState(false);
+            // 🌙 SISTEMA AVANZADO DE MODO OSCURO - FASE 3b
+            const [isDarkMode, setIsDarkMode] = useState(() => {
+                // 1. Verificar localStorage primero
+                const saved = localStorage.getItem('sudoku_theme');
+                if (saved !== null) {
+                    console.log('🌙 Tema cargado desde localStorage:', JSON.parse(saved));
+                    return JSON.parse(saved);
+                }
+                
+                // 2. Detectar preferencia del sistema como fallback
+                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                console.log('🌙 Detectada preferencia del sistema:', systemDark ? 'oscuro' : 'claro');
+                return systemDark;
+            });
+            
+            const [isTransitioning, setIsTransitioning] = useState(false);
+            const [followsSystem, setFollowsSystem] = useState(() => {
+                return localStorage.getItem('sudoku_theme') === null;
+            });
+            const [swipeHintShown, setSwipeHintShown] = useState(false);
             const [gameId, setGameId] = useState(null);
             const [loading, setLoading] = useState(true);
             const [difficulty, setDifficulty] = useState('easy');
@@ -262,6 +284,209 @@
             useEffect(() => {
                 localStorage.setItem('sudoku_sound_volume', soundVolume.toString());
             }, [soundVolume]);
+            
+            // 🌙 USEEFFECTS PARA MODO OSCURO AVANZADO - FASE 3b
+            
+            // 1. Aplicar tema al DOM y actualizar theme-color de PWA
+            useEffect(() => {
+                // Aplicar clase al document.body
+                document.body.classList.toggle('dark-theme', isDarkMode);
+                
+                // Actualizar theme-color meta para PWA dinámicamente
+                const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+                if (themeColorMeta) {
+                    themeColorMeta.content = isDarkMode ? '#1F2937' : '#4F46E5';
+                }
+                
+                // Guardar preferencia en localStorage
+                localStorage.setItem('sudoku_theme', JSON.stringify(isDarkMode));
+                setFollowsSystem(false); // Ya no sigue el sistema al cambiar manualmente
+                
+                console.log('🌙 Tema aplicado:', isDarkMode ? 'oscuro' : 'claro');
+            }, [isDarkMode]);
+            
+            // 2. Escuchar cambios en preferencia del sistema
+            useEffect(() => {
+                const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                
+                const handleSystemThemeChange = (e) => {
+                    // Solo aplicar si aún sigue al sistema (no ha seleccionado manualmente)
+                    if (localStorage.getItem('sudoku_theme') === null) {
+                        console.log('🌙 Cambio de tema del sistema detectado:', e.matches ? 'oscuro' : 'claro');
+                        setIsDarkMode(e.matches);
+                        setFollowsSystem(true);
+                    }
+                };
+                
+                mediaQuery.addListener(handleSystemThemeChange);
+                
+                return () => {
+                    mediaQuery.removeListener(handleSystemThemeChange);
+                };
+            }, []);
+            
+            // 🌙 COMPONENTE: BOTÓN AVANZADO DE MODO OSCURO - FASE 3b
+            const AdvancedThemeToggle = ({ isDarkMode, toggleDarkMode, isTransitioning, followsSystem }) => {
+                return React.createElement('div', { 
+                    className: 'relative inline-block',
+                    style: { '--theme-tooltip-delay': '0.5s' }
+                }, [
+                    // Botón principal con switch animado
+                    React.createElement('button', {
+                        key: 'toggle-button',
+                        onClick: toggleDarkMode,
+                        className: `theme-toggle ${isDarkMode ? 'dark' : ''} ${isTransitioning ? 'haptic-feedback' : ''}`,
+                        'aria-label': isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro',
+                        disabled: isTransitioning
+                    }, [
+                        // Icono del sol
+                        React.createElement('span', {
+                            key: 'sun-icon',
+                            className: 'theme-toggle-icon sun',
+                            'aria-hidden': 'true'
+                        }, '☀️'),
+                        
+                        // Icono de la luna
+                        React.createElement('span', {
+                            key: 'moon-icon', 
+                            className: 'theme-toggle-icon moon',
+                            'aria-hidden': 'true'
+                        }, '🌙')
+                    ]),
+                    
+                    // Tooltip informativo
+                    React.createElement('div', {
+                        key: 'tooltip',
+                        className: 'theme-tooltip'
+                    }, [
+                        React.createElement('div', {
+                            key: 'tooltip-title',
+                            style: { fontWeight: 'bold', marginBottom: '2px' }
+                        }, isDarkMode ? 'Modo Oscuro' : 'Modo Claro'),
+                        
+                        React.createElement('div', {
+                            key: 'tooltip-subtitle',
+                            style: { fontSize: '10px', opacity: 0.8 }
+                        }, followsSystem ? 'Sigue al sistema' : 'Personalizado'),
+                        
+                        React.createElement('div', {
+                            key: 'tooltip-hint',
+                            style: { fontSize: '10px', marginTop: '2px', opacity: 0.7 }
+                        }, '↔️ Desliza para cambiar')
+                    ]),
+                    
+                    // Indicador de tema del sistema
+                    followsSystem && React.createElement('div', {
+                        key: 'system-indicator',
+                        className: 'system-theme-indicator active',
+                        title: 'Siguiendo preferencia del sistema'
+                    })
+                ]);
+            };
+            
+            // 3. Función avanzada para toggle del tema con efectos
+            const toggleDarkMode = useCallback(() => {
+                setIsTransitioning(true);
+                
+                // Efecto visual de transición
+                const overlay = document.createElement('div');
+                overlay.className = 'theme-transition-overlay active';
+                document.body.appendChild(overlay);
+                
+                // Haptic feedback en dispositivos compatibles
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+                
+                // Sonido de confirmación si está habilitado
+                if (soundEnabled) {
+                    // playSound.click(); // Descomentaremos cuando tengamos playSound definido
+                }
+                
+                setTimeout(() => {
+                    setIsDarkMode(prev => !prev);
+                    
+                    setTimeout(() => {
+                        overlay.remove();
+                        setIsTransitioning(false);
+                    }, 300);
+                }, 150);
+                
+                console.log('🌙 Toggle tema activado');
+            }, [soundEnabled]);
+            
+            // 4. Touch gestures para cambio de tema (swipe horizontal)
+            useEffect(() => {
+                let startX = 0;
+                let startY = 0;
+                let moved = false;
+                
+                const handleTouchStart = (e) => {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                    moved = false;
+                };
+                
+                const handleTouchMove = (e) => {
+                    moved = true;
+                };
+                
+                const handleTouchEnd = (e) => {
+                    if (!moved) return;
+                    
+                    const endX = e.changedTouches[0].clientX;
+                    const endY = e.changedTouches[0].clientY;
+                    const deltaX = endX - startX;
+                    const deltaY = endY - startY;
+                    
+                    // Swipe horizontal mínimo de 100px y mayor que el vertical
+                    if (Math.abs(deltaX) > 100 && Math.abs(deltaX) > Math.abs(deltaY)) {
+                        // Solo en el header o parte superior (primeros 150px)
+                        if (startY < 150) {
+                            toggleDarkMode();
+                            
+                            // Mostrar hint la primera vez
+                            if (!swipeHintShown) {
+                                setSwipeHintShown(true);
+                                localStorage.setItem('sudoku_swipe_hint_shown', 'true');
+                            }
+                        }
+                    }
+                };
+                
+                // Solo en dispositivos táctiles
+                if ('ontouchstart' in window) {
+                    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+                    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+                    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+                    
+                    return () => {
+                        document.removeEventListener('touchstart', handleTouchStart);
+                        document.removeEventListener('touchmove', handleTouchMove);
+                        document.removeEventListener('touchend', handleTouchEnd);
+                    };
+                }
+            }, [toggleDarkMode, swipeHintShown]);
+            
+            // 5. Mostrar swipe hint en dispositivos táctiles nuevos
+            useEffect(() => {
+                const hintShown = localStorage.getItem('sudoku_swipe_hint_shown');
+                if (!hintShown && 'ontouchstart' in window) {
+                    const timer = setTimeout(() => {
+                        // Mostrar hint brevemente
+                        const hint = document.createElement('div');
+                        hint.className = 'swipe-hint show';
+                        hint.textContent = '←→ Desliza para cambiar tema';
+                        document.body.appendChild(hint);
+                        
+                        setTimeout(() => {
+                            hint.remove();
+                        }, 3000);
+                    }, 2000);
+                    
+                    return () => clearTimeout(timer);
+                }
+            }, []);
             
             // 🌍 SISTEMA DE TRADUCCIONES
             const useTranslations = () => {
@@ -2656,14 +2881,12 @@
                                     {/* 🌍 SELECTOR DE IDIOMA */}
                                     <LanguageSelector />
                                     
-                                    <button
-                                        onClick={() => setIsDarkMode(!isDarkMode)}
-                                        className={`p-2 rounded-md transition-colors ${
-                                            isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
-                                        }`}
-                                    >
-                                        {isDarkMode ? '☀️' : '🌙'}
-                                    </button>
+                                    <AdvancedThemeToggle 
+                                        isDarkMode={isDarkMode}
+                                        toggleDarkMode={toggleDarkMode}
+                                        isTransitioning={isTransitioning}
+                                        followsSystem={followsSystem}
+                                    />
                                 </div>
                             </div>
                         </div>

@@ -28,6 +28,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Sudoku">
     
+    <!-- ⭐ PWA MANIFEST Y ICONOS -->
+    <link rel="manifest" href="/Sudoku/public/manifest.json">
+    <link rel="apple-touch-icon" sizes="180x180" href="/Sudoku/public/assets/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/Sudoku/public/assets/icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/Sudoku/public/assets/icons/icon-144x144.png">
+    
     <!-- 🔗 OPEN GRAPH (REDES SOCIALES) -->
     <meta property="og:title" content="Sudoku Minimalista - Juego de Lógica Online">
     <meta property="og:description" content="El mejor juego de Sudoku online con sistema de logros, analíticas y 5 niveles de dificultad.">
@@ -44,6 +50,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- 📱 MOBILE-FIRST CSS OPTIMIZATIONS -->
+    <link rel="stylesheet" href="/Sudoku/public/assets/css/mobile-optimizations.css">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -3008,5 +3017,11 @@
         const root = ReactDOM.createRoot(document.getElementById('sudoku-app'));
         root.render(<SudokuApp />);
     </script>
+    
+    <!-- 🚀 PWA INTEGRATION -->
+    <script src="/Sudoku/public/assets/js/pwa-integration.js"></script>
+    
+    <!-- 🔧 ERROR FIXES & OPTIMIZATIONS -->
+    <script src="/Sudoku/public/assets/js/error-fixes.js"></script>
 </body>
 </html>

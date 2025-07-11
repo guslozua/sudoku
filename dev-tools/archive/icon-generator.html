@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Generador de Iconos PWA - Sudoku</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 2.5rem; margin-bottom: 10px; font-weight: 700; }
+        .header p { opacity: 0.9; font-size: 1.1rem; }
+        .content { padding: 40px; }
+        .generator-section {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-left: 4px solid #2563eb;
+        }
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .icon-preview {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+        .icon-preview:hover { transform: translateY(-5px); }
+        .icon-preview canvas {
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: #f1f5f9;
+        }
+        .icon-size { font-weight: 600; color: #1e293b; margin-bottom: 5px; }
+        .download-btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s ease;
+        }
+        .download-btn:hover { background: #1d4ed8; }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .control-group {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+        }
+        .control-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1e293b;
+        }
+        .control-group input, .control-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+        .control-group input:focus, .control-group select:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+        .generate-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .generate-btn:hover { transform: translateY(-2px); }
+        .download-all-btn {
+            background: linear-gradient(135deg, #7c3aed, #6366f1);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .download-all-btn:hover { transform: translateY(-2px); }
+        .status {
+            background: #ecfdf5;
+            color: #065f46;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .info-box {
+            background: #eff6ff;
+            border: 2px solid #bfdbfe;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .info-box h3 { color: #1e40af; margin-bottom: 10px; }
+        .info-box p { color: #1e3a8a; line-height: 1.6; }
+        .instructions {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .instructions h3 { color: #92400e; margin-bottom: 10px; }
+        .instructions ol { color: #78350f; padding-left: 20px; }
+        .instructions li { margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Generador de Iconos PWA</h1>
+            <p>Sudoku Minimalista - Corrige los errores de iconos faltantes</p>
+        </div>
+
+        <div class="content">
+            <div class="info-box">
+                <h3>🔧 Solución a Errores de Iconos PWA</h3>
+                <p>Este generador resolverá el error <strong>"GET http://localhost/Sudoku/public/assets/icons/icon-144x144.png 404 (Not Found)"</strong> y otros iconos faltantes. Generará todos los tamaños necesarios para PWA.</p>
+            </div>
+
+            <div class="generator-section">
+                <h2>🎨 Configuración del Icono</h2>
+                
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="iconText">Texto del Icono</label>
+                        <input type="text" id="iconText" value="S" maxlength="2" placeholder="S o Su">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="bgColor">Color de Fondo</label>
+                        <input type="color" id="bgColor" value="#2563eb">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="textColor">Color del Texto</label>
+                        <input type="color" id="textColor" value="#ffffff">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="borderRadius">Radio del Borde (%)</label>
+                        <input type="range" id="borderRadius" min="0" max="50" value="20">
+                        <span id="borderRadiusValue">20%</span>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="iconStyle">Estilo del Icono</label>
+                        <select id="iconStyle">
+                            <option value="text">Solo Texto</option>
+                            <option value="grid">Texto + Grid Sudoku</option>
+                            <option value="minimal">Minimalista</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="shadowIntensity">Intensidad de Sombra</label>
+                        <input type="range" id="shadowIntensity" min="0" max="100" value="30">
+                        <span id="shadowValue">30%</span>
+                    </div>
+                </div>
+
+                <button class="generate-btn" onclick="generateIcons()">
+                    🚀 Generar Todos los Iconos
+                </button>
+            </div>
+
+            <div class="generator-section">
+                <h2>📱 Vista Previa de Iconos</h2>
+                <div class="preview-grid" id="previewGrid">
+                    <!-- Los iconos se generarán aquí -->
+                </div>
+                
+                <button class="download-all-btn" onclick="downloadAllIcons()" id="downloadAllBtn" style="display: none;">
+                    📦 Descargar Todos los Iconos
+                </button>
+                
+                <div class="status" id="status" style="display: none;">
+                    ✅ Iconos generados exitosamente
+                </div>
+            </div>
+
+            <div class="instructions">
+                <h3>📋 Instrucciones de Instalación</h3>
+                <ol>
+                    <li>Haz clic en "Generar Todos los Iconos"</li>
+                    <li>Haz clic en "Descargar Todos los Iconos"</li>
+                    <li>Guarda todos los archivos en: <code>C:\xampp2\htdocs\Sudoku\public\assets\icons\</code></li>
+                    <li>Reemplaza los iconos existentes si es necesario</li>
+                    <li>Recarga la aplicación en: <code>http://localhost/Sudoku/public/</code></li>
+                    <li>Verifica que no hay más errores 404 en la consola</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ICON_SIZES = [
+            { size: 72, name: 'icon-72x72.png' },
+            { size: 96, name: 'icon-96x96.png' },
+            { size: 128, name: 'icon-128x128.png' },
+            { size: 144, name: 'icon-144x144.png' },
+            { size: 152, name: 'icon-152x152.png' },
+            { size: 192, name: 'icon-192x192.png' },
+            { size: 384, name: 'icon-384x384.png' },
+            { size: 512, name: 'icon-512x512.png' }
+        ];
+
+        let generatedIcons = [];
+
+        document.getElementById('borderRadius').addEventListener('input', function() {
+            document.getElementById('borderRadiusValue').textContent = this.value + '%';
+        });
+
+        document.getElementById('shadowIntensity').addEventListener('input', function() {
+            document.getElementById('shadowValue').textContent = this.value + '%';
+        });
+
+        function generateIcons() {
+            const previewGrid = document.getElementById('previewGrid');
+            previewGrid.innerHTML = '';
+            generatedIcons = [];
+
+            const config = {
+                text: document.getElementById('iconText').value || 'S',
+                bgColor: document.getElementById('bgColor').value,
+                textColor: document.getElementById('textColor').value,
+                borderRadius: parseInt(document.getElementById('borderRadius').value),
+                style: document.getElementById('iconStyle').value,
+                shadowIntensity: parseInt(document.getElementById('shadowIntensity').value)
+            };
+
+            ICON_SIZES.forEach(iconInfo => {
+                const iconData = createIcon(iconInfo.size, config);
+                generatedIcons.push({
+                    ...iconInfo,
+                    dataUrl: iconData
+                });
+                
+                createPreview(iconInfo, iconData);
+            });
+
+            document.getElementById('downloadAllBtn').style.display = 'block';
+            document.getElementById('status').style.display = 'block';
+        }
+
+        function createIcon(size, config) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = size;
+            canvas.height = size;
+
+            const borderRadius = (size * config.borderRadius) / 100;
+
+            ctx.beginPath();
+            if (borderRadius > 0) {
+                drawRoundedRect(ctx, 0, 0, size, size, borderRadius);
+            } else {
+                ctx.rect(0, 0, size, size);
+            }
+            ctx.fillStyle = config.bgColor;
+            ctx.fill();
+
+            if (config.shadowIntensity > 0) {
+                ctx.shadowColor = 'rgba(0,0,0,' + (config.shadowIntensity / 100) + ')';
+                ctx.shadowBlur = size * 0.05;
+                ctx.shadowOffsetY = size * 0.02;
+            }
+
+            switch (config.style) {
+                case 'text':
+                    drawTextIcon(ctx, size, config);
+                    break;
+                case 'grid':
+                    drawGridIcon(ctx, size, config);
+                    break;
+                case 'minimal':
+                    drawMinimalIcon(ctx, size, config);
+                    break;
+            }
+
+            return canvas.toDataURL('image/png');
+        }
+
+        function drawTextIcon(ctx, size, config) {
+            ctx.shadowColor = 'transparent';
+            ctx.fillStyle = config.textColor;
+            ctx.font = `bold ${size * 0.6}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(config.text, size / 2, size / 2);
+        }
+
+        function drawGridIcon(ctx, size, config) {
+            const gridSize = size * 0.7;
+            const startX = (size - gridSize) / 2;
+            const startY = (size - gridSize) / 2;
+            const cellSize = gridSize / 9;
+
+            ctx.strokeStyle = config.textColor + '40';
+            ctx.lineWidth = size * 0.005;
+
+            for (let i = 0; i <= 9; i++) {
+                const thickness = (i % 3 === 0) ? size * 0.01 : size * 0.005;
+                ctx.lineWidth = thickness;
+                
+                ctx.beginPath();
+                ctx.moveTo(startX, startY + i * cellSize);
+                ctx.lineTo(startX + gridSize, startY + i * cellSize);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(startX + i * cellSize, startY);
+                ctx.lineTo(startX + i * cellSize, startY + gridSize);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = config.textColor;
+            ctx.font = `bold ${size * 0.3}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(config.text, size / 2, size / 2);
+        }
+
+        function drawMinimalIcon(ctx, size, config) {
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const radius = size * 0.15;
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = config.textColor;
+            ctx.fill();
+
+            const dotSize = size * 0.02;
+            const positions = [
+                [size * 0.25, size * 0.25],
+                [size * 0.75, size * 0.25],
+                [size * 0.25, size * 0.75],
+                [size * 0.75, size * 0.75]
+            ];
+
+            positions.forEach(([x, y]) => {
+                ctx.beginPath();
+                ctx.arc(x, y, dotSize, 0, 2 * Math.PI);
+                ctx.fillStyle = config.textColor + '80';
+                ctx.fill();
+            });
+
+            ctx.fillStyle = config.bgColor;
+            ctx.font = `bold ${size * 0.12}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(config.text, centerX, centerY);
+        }
+
+        function drawRoundedRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        function createPreview(iconInfo, dataUrl) {
+            const previewGrid = document.getElementById('previewGrid');
+            
+            const preview = document.createElement('div');
+            preview.className = 'icon-preview';
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 100;
+            canvas.height = 100;
+            
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, 100, 100);
+            };
+            img.src = dataUrl;
+            
+            preview.innerHTML = `
+                <div class="icon-size">${iconInfo.size}x${iconInfo.size}</div>
+                <div style="margin-bottom: 10px;">${canvas.outerHTML}</div>
+                <button class="download-btn" onclick="downloadIcon('${iconInfo.name}', '${dataUrl}')">
+                    ⬇️ Descargar
+                </button>
+            `;
+            
+            previewGrid.appendChild(preview);
+        }
+
+        function downloadIcon(filename, dataUrl) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = dataUrl;
+            link.click();
+        }
+
+        function downloadAllIcons() {
+            generatedIcons.forEach((icon, index) => {
+                setTimeout(() => {
+                    downloadIcon(icon.name, icon.dataUrl);
+                }, index * 100);
+            });
+        }
+
+        window.addEventListener('load', () => {
+            generateIcons();
+        });
+    </script>
+</body>
+</html>

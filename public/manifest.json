@@ -1,0 +1,76 @@
+{
+  "name": "Sudoku Minimalista",
+  "short_name": "Sudoku",
+  "description": "Sudoku minimalista y optimizado - La mejor experiencia de juego",
+  "start_url": "/Sudoku/public/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "scope": "/Sudoku/public/",
+  "lang": "es",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "assets/favicons/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "assets/favicons/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "assets/favicons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/favicons/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/favicons/favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Nuevo Juego",
+      "short_name": "Nuevo",
+      "description": "Iniciar un nuevo sudoku",
+      "url": "/Sudoku/public/?action=new",
+      "icons": [
+        {
+          "src": "assets/favicons/favicon-32x32.png",
+          "sizes": "32x32"
+        }
+      ]
+    },
+    {
+      "name": "Continuar",
+      "short_name": "Continuar",
+      "description": "Continuar juego guardado",
+      "url": "/Sudoku/public/?action=continue",
+      "icons": [
+        {
+          "src": "assets/favicons/favicon-32x32.png",
+          "sizes": "32x32"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
+}
